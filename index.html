@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shape Mask Studio Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --app-height: 100vh; }
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body { 
+            margin: 0; padding: 0; width: 100vw; height: 100vh; height: var(--app-height); overflow: hidden; 
+            background-color: #050505; color: #fff; font-family: system-ui, -apple-system, sans-serif; 
+            touch-action: none; 
+        }
+        .app-container { display: flex; width: 100%; height: 100vh; height: var(--app-height); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .cursor-draw { cursor: crosshair; }
+        .cursor-move { cursor: grab; }
+        .cursor-move:active { cursor: grabbing; }
+        
+        .btn-tool, .btn-shape { width: 48px; height: 48px; margin: 0 6px; flex-shrink: 0; border-radius: 0.75rem; background-color: #262626; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; border: 1px solid transparent; transition: background-color 0.2s; position: relative; cursor: pointer; color: white; }
+        .btn-tool:hover, .btn-shape:hover { background-color: #404040; }
+        .btn-tool.active { background-color: #2563eb; color: #ffffff; border-color: #60a5fa; box-shadow: 0 0 10px rgba(37,99,235,0.5); }
+        .btn-shape.active { background-color: rgba(30,58,138,0.5); color: #60a5fa; border-color: #3b82f6; }
+        
+        .thumb { width: 5.5rem; height: 5.5rem; border-radius: 0.75rem; background-color: #262626; flex-shrink: 0; position: relative; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; overflow: hidden; }
+        .thumb.active { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.6); }
+        
+        .bg-badge { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); background: rgba(34,197,94,0.95); color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; pointer-events: none; z-index: 10; letter-spacing: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        .thumb-btn { position: absolute; width: 24px; height: 24px; background: rgba(0,0,0,0.6); border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 12px; z-index: 15; transition: background 0.2s; }
+        .thumb-btn:hover { background: rgba(239,68,68,0.9); }
+
+        @keyframes flashEffect { 0% { opacity: 0; } 50% { opacity: 0.8; } 100% { opacity: 0; } }
+        .flash-anim { animation: flashEffect 0.3s ease-out forwards; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #3b82f6; cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #444; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<script>
+    function setAppHeight() { document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`); }
+</script>
+
+<div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-[100] hidden"></div>
+
+<div id="inputModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center">
+    <div class="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl shadow-2xl w-80 flex flex-col gap-4">
+        <h3 id="modalTitle" class="text-lg font-semibold">Enter Value</h3>
+        <input type="text" id="modalInput" class="w-full bg-neutral-800 border border-neutral-600 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500" autocomplete="off">
+        <div class="flex justify-end gap-2 mt-2">
+            <button id="modalCancel" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm">Cancel</button>
+            <button id="modalConfirm" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center">
+    <div class="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl shadow-2xl w-80 flex flex-col gap-4">
+        <h3 id="confirmTitle" class="text-lg font-semibold text-white">Confirm</h3>
+        <p id="confirmMessage" class="text-sm text-neutral-300">Are you sure?</p>
+        <div class="flex justify-end gap-2 mt-2">
+            <button id="confirmNo" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm">No</button>
+            <button id="confirmYes" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-sm font-medium">Yes</button>
+        </div>
+    </div>
+</div>
+
+<div id="exportModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center">
+    <div class="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl shadow-2xl w-80 flex flex-col gap-4">
+        <h3 class="text-lg font-semibold">Recording Mode</h3>
+        <div class="flex flex-col gap-2">
+            <button id="recModeBg" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-left">🎬 Background Video Duration</button>
+            <button id="recModeCustom" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-left">⏱️ Custom Duration</button>
+            <button id="recModeManual" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-left">🖐️ Manual (Click Stop)</button>
+        </div>
+        <div class="flex justify-end mt-2">
+            <button id="exportCancel" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="svgLibraryModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex-col items-center justify-center">
+    <div class="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl shadow-2xl w-[90%] max-w-3xl flex flex-col gap-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-white">Vector Masks Library</h3>
+            <button id="closeSvgLibBtn" class="text-neutral-400 hover:text-white px-2 text-xl font-bold">✕</button>
+        </div>
+        <div class="flex gap-2">
+            <button id="uploadSvgFilesBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium">📄 Load Files</button>
+            <button id="uploadSvgFolderBtn" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-medium">📁 Load Folder</button>
+            <input type="file" id="svgFileInput" accept=".svg,.png" multiple class="hidden" />
+            <input type="file" id="svgFolderInput" webkitdirectory directory multiple class="hidden" />
+        </div>
+        <div id="svgGrid" class="grid grid-cols-4 md:grid-cols-8 gap-4 overflow-y-auto max-h-80 p-2 border border-neutral-800 rounded-xl bg-neutral-950/50 min-h-[100px]">
+            <div class="col-span-full text-center text-neutral-500 text-sm py-8 pointer-events-none">Drag & Drop SVG files onto the canvas, or use buttons above.</div>
+        </div>
+    </div>
+</div>
+
+<div class="app-container flex-col md:flex-row">
+    <!-- Для воспроизведения GIF-анимаций контейнер фиксируется на 100px с opacity: 0.001, чтобы браузер не ставил их на паузу -->
+    <div id="mediaBin" class="absolute w-[100px] h-[100px] overflow-hidden pointer-events-none -z-10" style="top:0; left:0; opacity: 0.001;"></div>
+    
+    <input type="file" id="fileInput" accept="image/*,video/*" multiple class="hidden" />
+    <input type="file" id="replaceInput" accept="image/*,video/*" class="hidden" />
+    <input type="file" id="replaceMaskInput" accept="image/*,video/*" class="hidden" />
+    <input type="file" id="loadProjInput" accept=".json" class="hidden" />
+
+    <!-- Gallery Sidebar -->
+    <div class="order-1 w-full md:w-32 h-28 md:h-full bg-neutral-950 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-row md:flex-col items-center p-2 z-10 shrink-0 gap-3 overflow-x-auto md:overflow-y-auto no-scrollbar">
+        <button id="uploadBtn" class="w-20 h-20 shrink-0 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 transition-colors text-3xl flex items-center justify-center shadow-lg">➕</button>
+        <div id="gallery" class="flex flex-row md:flex-col gap-3 items-center"></div>
+    </div>
+
+    <!-- Main Canvas Container -->
+    <div class="order-2 flex-1 flex flex-col bg-black overflow-hidden relative min-w-0 min-h-0" id="canvasContainer">
+        
+        <div id="canvasWrapper" class="flex-1 relative cursor-draw min-h-0 overflow-hidden flex items-center justify-center bg-[#0a0a0a]">
+            
+            <canvas id="mainCanvas" class="max-w-full max-h-full block shadow-2xl transition-transform duration-200"></canvas>
+            
+            <!-- Toolbar for Boolean Mask Editing -->
+            <div id="editMaskToolbar" class="absolute top-4 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-2 rounded-xl shadow-2xl z-40 hidden flex gap-2">
+                <button id="editOpAdd" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">+ Add</button>
+                <button id="editOpSub" class="bg-neutral-800 text-neutral-400 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">- Sub</button>
+                <div class="w-px h-6 bg-neutral-700 mx-1 self-center"></div>
+                <button id="editFinishBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">Done</button>
+            </div>
+
+            <!-- Toolbar for Pan Media -->
+            <div id="panMediaToolbar" class="absolute top-4 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-2 rounded-xl shadow-2xl z-40 hidden flex items-center gap-3">
+                <span class="text-amber-400 text-xs font-bold uppercase tracking-wide">Pan Media</span>
+                <div class="w-px h-6 bg-neutral-700 mx-1"></div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-neutral-400 uppercase">Scale</span>
+                    <input type="range" id="mediaScaleSlider" min="0.1" max="5" step="0.05" value="1" class="w-24">
+                </div>
+                <div class="w-px h-6 bg-neutral-700 mx-1"></div>
+                <button id="panFinishBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">Done</button>
+            </div>
+
+            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50">
+                <span class="text-4xl mb-2">🎬</span>
+                <p class="text-sm font-medium tracking-widest uppercase text-center">Upload Media<br><span class="text-xs opacity-70">Drag & Drop supported</span></p>
+            </div>
+
+            <button id="finishPolyBtn" class="absolute hidden bottom-6 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:bg-blue-500 z-20 text-sm">
+                Finish Shape ✔️
+            </button>
+            
+            <div id="floatingMenu" class="absolute hidden bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-4 rounded-xl shadow-2xl z-30 flex-col gap-3 w-64">
+                <div id="menuHeader" class="flex justify-between items-center border-b border-neutral-700 pb-2 cursor-move select-none touch-none">
+                    <span class="text-xs font-bold text-neutral-400 uppercase tracking-wider pointer-events-none">Properties</span>
+                    <button id="closeMenuBtn" class="text-neutral-400 hover:text-white px-2 py-1 bg-neutral-800 rounded pointer-events-auto">✕</button>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="layerUpBtn" class="bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 rounded text-xs flex-1">⬆️ Up</button>
+                    <button id="layerDownBtn" class="bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 rounded text-xs flex-1">⬇️ Down</button>
+                    <button id="deleteMaskBtn" class="bg-red-900/40 text-red-400 hover:bg-red-900/60 px-3 py-1.5 rounded text-xs">🗑️</button>
+                </div>
+
+                <div class="flex gap-2 mt-1">
+                    <button id="flipXBtn" class="bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 rounded text-xs flex-1">↔️ Flip X</button>
+                    <button id="flipYBtn" class="bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 rounded text-xs flex-1">↕️ Flip Y</button>
+                </div>
+
+                <!-- Строка настройки контура (Stroke) -->
+                <div class="flex items-center gap-2 mt-1 bg-neutral-800/50 p-1.5 rounded">
+                    <span class="text-[10px] text-neutral-400 uppercase w-12 font-bold tracking-wider">Border</span>
+                    <input type="color" id="strokeColorPicker" value="#ffffff" class="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent" title="Border Color">
+                    <input type="range" id="strokeWidthSlider" min="0" max="50" value="0" class="flex-1" title="Border Width">
+                    <span id="strokeWidthVal" class="text-[10px] text-neutral-400 w-4 text-right">0</span>
+                </div>
+
+                <button id="panMediaBtn" class="bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 w-full py-1.5 rounded text-xs font-bold border border-amber-800/50 mt-1">🔀 Pan Media</button>
+                <button id="replaceMaskMediaBtn" class="bg-blue-900/40 text-blue-300 hover:bg-blue-900/60 w-full py-1.5 rounded text-xs font-bold border border-blue-800/50 mt-1">🖼️ Replace Media</button>
+                <button id="editMaskBtn" class="bg-purple-900/40 text-purple-300 hover:bg-purple-900/60 w-full py-1.5 rounded text-xs font-bold uppercase border border-purple-800/50 mt-1">✏️ Edit Shape (+/-)</button>
+                <button id="saveTemplateBtn" class="bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60 w-full py-1.5 rounded text-xs font-medium border border-emerald-800/50 mt-1">💾 Save Template</button>
+
+                <div id="videoControls" class="flex flex-col gap-2 mt-1 hidden">
+                    <div class="flex justify-between text-[10px] text-neutral-400 uppercase"><span>Speed</span><span id="speedVal">1.0x</span></div>
+                    <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar Sidebar -->
+    <div class="order-3 w-full md:w-24 h-auto md:h-full bg-neutral-950 border-t md:border-t-0 md:border-l border-neutral-800 flex flex-row md:flex-col items-center p-3 md:py-4 z-10 shrink-0 gap-3 overflow-x-auto md:overflow-y-auto no-scrollbar">
+        <button id="undoBtn" class="btn-tool" title="Undo">↩️</button>
+        <div class="w-px h-10 md:w-10 md:h-px bg-neutral-800 mx-1 shrink-0"></div>
+        
+        <button id="modeDraw" class="btn-tool active" title="Draw">✏️</button>
+        <button id="modeMove" class="btn-tool" title="Move">🖐️</button>
+        
+        <div class="w-px h-10 md:w-10 md:h-px bg-neutral-800 mx-1 shrink-0"></div>
+        
+        <button class="btn-shape active" data-shape="square" title="Square">⬜</button>
+        <button class="btn-shape" data-shape="circle" title="Circle">⭕</button>
+        <button class="btn-shape" data-shape="triangle" title="Triangle">🔺</button>
+        <button class="btn-shape" data-shape="polygon" title="Polygon">🛑</button>
+        <button class="btn-shape" data-shape="freedraw" title="Free Draw">➰</button>
+        <button class="btn-shape" data-shape="text" title="Text Tool">🔠</button>
+        <button class="btn-shape" data-shape="template" title="Templates">🧩</button>
+        <button class="btn-shape" data-shape="mosaic" title="Random Mosaic">🍱</button>
+        <button class="btn-shape" data-shape="svg_mask" title="Custom Vector">🌟</button>
+        
+        <div class="w-px h-10 md:w-10 md:h-px bg-neutral-800 mx-1 shrink-0"></div>
+        <button id="saveProjBtn" class="btn-tool" title="Save Project">💾</button>
+        <button id="loadProjBtn" class="btn-tool" title="Load Project">📂</button>
+        
+        <div class="w-px h-10 md:w-10 md:h-px bg-neutral-800 mx-1 shrink-0"></div>
+        <button id="qualityBtn" class="btn-tool text-xs font-bold text-blue-400" title="Quality">HQ</button>
+        <button id="ratioBtn" class="btn-tool text-xs font-bold text-gray-300" title="Aspect Ratio">Auto</button>
+        <button id="playBtn" class="btn-tool" title="Global Play/Pause">⏸️</button>
+        <button id="recordBtn" class="btn-tool relative" title="Record Export">
+            ⏺️<span id="recDot" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse hidden"></span>
+        </button>
+    </div>
+</div>
+
+<script>
+    let modalCallback = null;
+    function showModal(title, placeholder, cb) {
+        document.getElementById('modalTitle').innerText = title;
+        const input = document.getElementById('modalInput');
+        input.placeholder = placeholder; input.value = '';
+        document.getElementById('inputModal').classList.remove('hidden');
+        input.focus();
+        modalCallback = cb;
+    }
+    document.getElementById('modalCancel').onclick = () => { document.getElementById('inputModal').classList.add('hidden'); if(modalCallback) modalCallback(null); };
+    document.getElementById('modalConfirm').onclick = () => { document.getElementById('inputModal').classList.add('hidden'); modalCallback(document.getElementById('modalInput').value); };
+
+    let confirmCallback = null;
+    function showConfirm(title, message, cb) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        document.getElementById('confirmModal').classList.remove('hidden');
+        confirmCallback = cb;
+    }
+    document.getElementById('confirmNo').onclick = () => { document.getElementById('confirmModal').classList.add('hidden'); if(confirmCallback) confirmCallback(false); };
+    document.getElementById('confirmYes').onclick = () => { document.getElementById('confirmModal').classList.add('hidden'); if(confirmCallback) confirmCallback(true); };
+
+    const App = { 
+        mode: 'DRAWING', activeTool: 'draw', shape: 'square', quality: 1.0, isPlaying: true,
+        mediaList: [], bgMediaId: null, activeMediaId: null, replacingMediaId: null,
+        templates: [], editBoolOp: 'add', aspectRatio: 'auto',
+        workW: 1280, workH: 720,
+        svgMasks: [], activeSvgId: null
+    };
+    let masks = [], undoStack = [];
+    let isRecording = false, mediaRecorder = null, recordedChunks = [];
+    
+    document.getElementById('closeSvgLibBtn').onclick = () => document.getElementById('svgLibraryModal').classList.replace('flex', 'hidden');
+    document.getElementById('uploadSvgFilesBtn').onclick = () => document.getElementById('svgFileInput').click();
+    document.getElementById('uploadSvgFolderBtn').onclick = () => document.getElementById('svgFolderInput').click();
+    
+    const handleSvgUpload = e => {
+        const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.svg') || f.name.toLowerCase().endsWith('.png'));
+        handleSvgFiles(files);
+        e.target.value = '';
+    };
+    document.getElementById('svgFileInput').onchange = handleSvgUpload;
+    document.getElementById('svgFolderInput').onchange = handleSvgUpload;
+
+    function handleSvgFiles(files) {
+        if(!files.length) return;
+        files.forEach((file) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image(); img.src = url;
+            const id = 'svg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            App.svgMasks.push({ id, name: file.name, url, img });
+            if(!App.activeSvgId) App.activeSvgId = id;
+        });
+        renderSvgLibrary();
+    }
+
+    function renderSvgLibrary() {
+        const grid = document.getElementById('svgGrid');
+        grid.innerHTML = '';
+        if(App.svgMasks.length === 0) {
+            grid.innerHTML = `<div class="col-span-full text-center text-neutral-500 text-sm py-8 pointer-events-none">Drag & Drop SVG files onto the canvas, or use buttons above.</div>`;
+            return;
+        }
+        App.svgMasks.forEach(svg => {
+            const div = document.createElement('div');
+            div.className = `w-16 h-16 bg-neutral-800 rounded-lg cursor-pointer flex items-center justify-center p-2 border-2 ${App.activeSvgId === svg.id ? 'border-blue-500' : 'border-transparent'} hover:border-blue-400 transition-colors`;
+            
+            // Drag and Drop (для перетаскивания иконок из меню)
+            div.draggable = true;
+            div.ondragstart = (e) => {
+                e.dataTransfer.setData('text/svg-id', svg.id);
+            };
+
+            div.innerHTML = `<img src="${svg.url}" class="max-w-full max-h-full object-contain pointer-events-none" />`;
+            div.onclick = () => {
+                App.activeSvgId = svg.id;
+                renderSvgLibrary();
+                document.getElementById('svgLibraryModal').classList.replace('flex', 'hidden');
+                document.querySelector('[data-shape="svg_mask"]').click();
+            };
+            grid.appendChild(div);
+        });
+    }
+
+    try {
+        const savedTemplates = localStorage.getItem('sms_templates');
+        if (savedTemplates) App.templates = JSON.parse(savedTemplates);
+    } catch(e) { console.error("Error loading templates:", e); }
+
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    const exportCanvas = document.createElement('canvas'), exportCtx = exportCanvas.getContext('2d');
+    const previewLayerCanvas = document.createElement('canvas'); 
+    const exportLayerCanvas = document.createElement('canvas');  
+    const maskBuffer = document.createElement('canvas'), maskCtx = maskBuffer.getContext('2d', { willReadFrequently: true }); 
+    const exportMaskBuffer = document.createElement('canvas'), exportMaskCtx = exportMaskBuffer.getContext('2d'); 
+    
+    const canvasWrapper = document.getElementById('canvasWrapper');
+    const floatingMenu = document.getElementById('floatingMenu');
+    
+    function updateWorkspace() {
+        let baseW = canvasWrapper.clientWidth || 1280;
+        let baseH = canvasWrapper.clientHeight || 720;
+        
+        if (App.aspectRatio !== 'auto') {
+            if(App.aspectRatio === '1:1') { baseW = 1080; baseH = 1080; }
+            else if(App.aspectRatio === '4:3') { baseW = 1440; baseH = 1080; }
+            else if(App.aspectRatio === '16:9') { baseW = 1920; baseH = 1080; }
+            else if(App.aspectRatio === '9:16') { baseW = 1080; baseH = 1920; }
+        } else if (App.bgMediaId) {
+            const bg = App.mediaList.find(x => x.id === App.bgMediaId);
+            if (bg && bg.element) {
+                baseW = bg.element.videoWidth || bg.element.naturalWidth || baseW;
+                baseH = bg.element.videoHeight || bg.element.naturalHeight || baseH;
+            }
+        }
+        
+        App.workW = baseW;
+        App.workH = baseH;
+        resizeCanvas();
+    }
+
+    function resizeCanvas() {
+        if(!App.workW) { App.workW = 1280; App.workH = 720; }
+        
+        canvas.width = App.workW * App.quality; 
+        canvas.height = App.workH * App.quality;
+        
+        const ww = canvasWrapper.clientWidth;
+        const wh = canvasWrapper.clientHeight;
+        if (ww > 0 && wh > 0) {
+            const scale = Math.min(ww / App.workW, wh / App.workH);
+            canvas.style.width = `${App.workW * scale}px`;
+            canvas.style.height = `${App.workH * scale}px`;
+        }
+        
+        previewLayerCanvas.width = canvas.width; previewLayerCanvas.height = canvas.height;
+        exportCanvas.width = App.workW; exportCanvas.height = App.workH;
+        exportLayerCanvas.width = App.workW; exportLayerCanvas.height = App.workH;
+        maskBuffer.width = canvas.width; maskBuffer.height = canvas.height;
+        exportMaskBuffer.width = App.workW; exportMaskBuffer.height = App.workH;
+    }
+
+    window.addEventListener('resize', () => { setAppHeight(); resizeCanvas(); }); 
+    window.addEventListener('orientationchange', () => { setAppHeight(); resizeCanvas(); });
+
+    function cloneMediaToDOM(srcEl, type) {
+        if(!srcEl) return null;
+        const clone = document.createElement(type === 'image' ? 'img' : 'video');
+        clone.src = srcEl.src; 
+        document.getElementById('mediaBin').appendChild(clone);
+        if(type === 'video') {
+            clone.muted = true; clone.loop = true; clone.playsInline = true;
+            clone.playbackRate = srcEl.playbackRate || 1;
+            if(App.isPlaying) { const p = clone.play(); if(p !== undefined) p.catch(()=>{}); }
+        }
+        return clone;
+    }
+
+    const ratios = ['Auto', '1:1', '4:3', '16:9', '9:16'];
+    let currentRatioIdx = 0;
+    document.getElementById('ratioBtn').onclick = function() {
+        currentRatioIdx = (currentRatioIdx + 1) % ratios.length;
+        this.innerText = ratios[currentRatioIdx];
+        App.aspectRatio = ratios[currentRatioIdx].toLowerCase();
+        if(App.aspectRatio !== 'auto') {
+            this.classList.replace('text-gray-300', 'text-blue-400');
+        } else {
+            this.classList.replace('text-blue-400', 'text-gray-300');
+        }
+        updateWorkspace();
+    };
+
+    document.getElementById('saveProjBtn').onclick = () => {
+        const exportData = {
+            version: 1.9,
+            templates: App.templates,
+            masks: masks.map(m => {
+                const copy = JSON.parse(JSON.stringify(m)); 
+                delete copy.clonedMedia;
+                return copy;
+            })
+        };
+        const blob = new Blob([JSON.stringify(exportData)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `SMS_Project_${Date.now()}.json`; a.click();
+    };
+
+    document.getElementById('loadProjBtn').onclick = () => document.getElementById('loadProjInput').click();
+    document.getElementById('loadProjInput').onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const data = JSON.parse(evt.target.result);
+                if (data.templates) {
+                    App.templates = data.templates;
+                    localStorage.setItem('sms_templates', JSON.stringify(App.templates));
+                }
+                if (data.masks) {
+                    saveUndo();
+                    masks = data.masks.map(m => {
+                        let mediaItem = App.mediaList.find(x => x.id === m.mediaId);
+                        if (!mediaItem && App.mediaList.length > 0) mediaItem = App.mediaList[0];
+                        if (mediaItem) {
+                            m.clonedMedia = cloneMediaToDOM(mediaItem.element, mediaItem.type);
+                            m.mediaId = mediaItem.id;
+                        }
+                        return m;
+                    });
+                }
+                e.target.value = ''; 
+            } catch(err) { alert("Invalid project file"); }
+        };
+        reader.readAsText(file);
+    };
+
+    function saveUndo() { 
+        undoStack.push(JSON.stringify(masks.map(m => { const c={...m}; delete c.clonedMedia; return c; }))); 
+    }
+
+    document.getElementById('undoBtn').onclick = () => {
+        if(!undoStack.length) return;
+        masks = JSON.parse(undoStack.pop()).map(m => {
+            const src = App.mediaList.find(x => x.id === m.mediaId);
+            if(src) m.clonedMedia = cloneMediaToDOM(src.element, src.type);
+            return m;
+        });
+        selectedMask = null; floatingMenu.classList.add('hidden');
+    };
+
+    document.querySelectorAll('.btn-shape').forEach(btn => {
+        btn.onclick = () => {
+            const shape = btn.dataset.shape;
+            
+            if (shape === 'mosaic') {
+                showModal("Glitch Mosaic", "Enter number of tiles (e.g. 25)", (val) => {
+                    if (val && !isNaN(val)) generateMosaic(parseInt(val));
+                });
+                return;
+            }
+            
+            if (shape === 'svg_mask') {
+                document.getElementById('svgLibraryModal').classList.remove('hidden');
+                document.getElementById('svgLibraryModal').classList.add('flex');
+                renderSvgLibrary();
+                if(App.svgMasks.length === 0) return;
+            }
+
+            document.querySelectorAll('.btn-shape').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            App.shape = shape;
+            if(App.mode !== 'EDIT_MASK') setMode('DRAWING');
+            if(App.shape === 'template' && App.templates.length === 0) {
+                showModal("No Templates", "Save a shape first!", () => setMode('MOVING'));
+            }
+        };
+    });
+
+    function generateMosaic(count) {
+        if (count < 2) count = 2;
+        if (count > 300) count = 300; 
+        
+        let rects = [{x: 0, y: 0, w: App.workW, h: App.workH}];
+        while(rects.length < count) {
+            rects.sort((a,b) => (b.w*b.h) - (a.w*a.h));
+            let r = rects.shift();
+            
+            let splitHoriz = r.w > r.h; 
+            let splitRatio = 0.3 + Math.random() * 0.4;
+            
+            if(splitHoriz) {
+                let w1 = r.w * splitRatio;
+                rects.push({x: r.x, y: r.y, w: w1, h: r.h});
+                rects.push({x: r.x + w1, y: r.y, w: r.w - w1, h: r.h});
+            } else {
+                let h1 = r.h * splitRatio;
+                rects.push({x: r.x, y: r.y, w: r.w, h: h1});
+                rects.push({x: r.x, y: r.y + h1, w: r.w, h: r.h - h1});
+            }
+        }
+        
+        saveUndo();
+        const gap = 3; 
+        
+        rects.forEach(r => {
+            let m = createBaseMask(r.x + gap, r.y + gap);
+            m.type = 'square';
+            m.endX = r.x + r.w - gap;
+            m.endY = r.y + r.h - gap;
+            
+            m.mediaOffsetX = (Math.random() - 0.5) * App.workW * 0.7;
+            m.mediaOffsetY = (Math.random() - 0.5) * App.workH * 0.7;
+            
+            const src = App.mediaList.find(x => x.id === m.mediaId);
+            if(src) m.clonedMedia = cloneMediaToDOM(src.element, src.type);
+            masks.push(m);
+        });
+        
+        setMode('MOVING'); 
+    }
+
+    function updateToolUI() {
+        document.getElementById('modeDraw').classList.toggle('active', App.activeTool === 'draw');
+        document.getElementById('modeMove').classList.toggle('active', App.activeTool === 'move');
+        canvasWrapper.classList.toggle('cursor-draw', App.activeTool === 'draw');
+        canvasWrapper.classList.toggle('cursor-move', App.activeTool === 'move');
+    }
+
+    function setMode(mode) {
+        if (App.mode === 'EDIT_MASK' && (mode === 'DRAWING' || mode === 'MOVING')) {
+            App.activeTool = mode === 'DRAWING' ? 'draw' : 'move';
+            updateToolUI();
+            return;
+        }
+
+        App.mode = mode;
+        if (mode === 'DRAWING') App.activeTool = 'draw';
+        if (mode === 'MOVING' || mode === 'PAN_MEDIA') App.activeTool = 'move';
+        
+        updateToolUI();
+        
+        if(mode !== 'EDIT_MASK') document.getElementById('editMaskToolbar').classList.add('hidden');
+        if(mode !== 'PAN_MEDIA') document.getElementById('panMediaToolbar').classList.add('hidden');
+        if(mode !== 'MOVING' && mode !== 'EDIT_MASK' && mode !== 'PAN_MEDIA') { floatingMenu.classList.add('hidden'); }
+        if((mode !== 'DRAWING' && mode !== 'EDIT_MASK') || App.shape !== 'polygon') document.getElementById('finishPolyBtn').classList.add('hidden');
+    }
+    
+    document.getElementById('modeDraw').onclick = () => setMode('DRAWING');
+    document.getElementById('modeMove').onclick = () => setMode('MOVING');
+
+    document.getElementById('qualityBtn').onclick = function() {
+        if(App.quality === 1) { App.quality = 0.5; this.innerText = 'LQ'; this.classList.replace('text-blue-400', 'text-yellow-400'); }
+        else if(App.quality === 0.5) { App.quality = 0.25; this.innerText = 'VLQ'; this.classList.replace('text-yellow-400', 'text-red-400'); }
+        else { App.quality = 1; this.innerText = 'HQ'; this.classList.replace('text-red-400', 'text-blue-400'); }
+        resizeCanvas();
+    };
+
+    document.getElementById('playBtn').onclick = function() {
+        App.isPlaying = !App.isPlaying;
+        this.innerText = App.isPlaying ? '⏸️' : '▶️';
+        App.mediaList.forEach(m => {
+            if (m.type === 'video') {
+                if (App.isPlaying) { const p = m.element.play(); if (p) p.catch(()=>{}); }
+                else { m.element.pause(); }
+            }
+        });
+        masks.forEach(m => {
+            if (m.clonedMedia && m.clonedMedia.tagName === 'VIDEO') {
+                if (App.isPlaying) { const p = m.clonedMedia.play(); if (p) p.catch(()=>{}); }
+                else { m.clonedMedia.pause(); }
+            }
+        });
+    };
+
+    document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('fileInput').onchange = e => handleFiles(e.target.files);
+    document.getElementById('replaceInput').onchange = e => handleFiles(e.target.files, true);
+
+    document.getElementById('replaceMaskMediaBtn').onclick = () => { if(selectedMask) document.getElementById('replaceMaskInput').click(); };
+    document.getElementById('replaceMaskInput').onchange = e => {
+        if(e.target.files.length && selectedMask) handleFiles(e.target.files, false, selectedMask);
+        e.target.value = '';
+    };
+
+    canvasWrapper.addEventListener('dragover', e => e.preventDefault());
+    canvasWrapper.addEventListener('drop', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        
+        const ratioX = rect.width ? App.workW / rect.width : 1;
+        const ratioY = rect.height ? App.workH / rect.height : 1;
+        const x = (e.clientX - rect.left) * ratioX;
+        const y = (e.clientY - rect.top) * ratioY;
+        
+        const hit = findHitMask(x, y);
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const files = Array.from(e.dataTransfer.files);
+            const svgFiles = files.filter(f => f.name.toLowerCase().endsWith('.svg') || f.type === 'image/svg+xml' || f.name.toLowerCase().endsWith('.png'));
+            const mediaFiles = files.filter(f => !svgFiles.includes(f));
+            
+            if (svgFiles.length > 0) {
+                handleSvgFiles(svgFiles);
+                document.querySelector('[data-shape="svg_mask"]').click();
+            }
+            if (mediaFiles.length > 0) {
+                handleFiles(mediaFiles, false, hit);
+            }
+        } else {
+            const svgId = e.dataTransfer.getData('text/svg-id');
+            if (svgId) {
+                // Дроп вектора из библиотеки
+                document.getElementById('svgLibraryModal').classList.replace('flex', 'hidden');
+                App.activeSvgId = svgId;
+                App.shape = 'svg_mask';
+                
+                saveUndo();
+                let m = createBaseMask(x, y);
+                m.endX = x + 300; 
+                m.endY = y + 300;
+                
+                const src = App.mediaList.find(media => media.id === m.mediaId);
+                if(src) m.clonedMedia = cloneMediaToDOM(src.element, src.type);
+                
+                masks.push(m);
+                setMode('MOVING');
+                selectedMask = m;
+                updateToolUI();
+                return;
+            }
+
+            const mediaId = e.dataTransfer.getData('text/plain');
+            if (mediaId) {
+                if (hit) {
+                    saveUndo();
+                    const src = App.mediaList.find(m => m.id === mediaId);
+                    if (src) {
+                        hit.mediaId = mediaId;
+                        if(hit.clonedMedia && hit.clonedMedia.parentNode) hit.clonedMedia.parentNode.removeChild(hit.clonedMedia);
+                        hit.clonedMedia = cloneMediaToDOM(src.element, src.type);
+                    }
+                } else {
+                    App.bgMediaId = mediaId;
+                    updateWorkspace();
+                }
+                renderGallery();
+            }
+        }
+    });
+
+    function handleFiles(files, isReplace = false, targetMask = null) {
+        Array.from(files).forEach((file, index) => {
+            const url = URL.createObjectURL(file);
+            const type = file.type.startsWith('video') ? 'video' : 'image';
+            const el = document.createElement(type === 'image' ? 'img' : 'video'); 
+            el.src = url;
+            
+            if(type === 'video') { 
+                el.muted = true; el.loop = true; el.playsInline = true; 
+                if(App.isPlaying) { const p = el.play(); if(p) p.catch(()=>{}); }
+                el.onloadedmetadata = () => updateWorkspace();
+            } else {
+                el.onload = () => updateWorkspace();
+            }
+            
+            document.getElementById('mediaBin').appendChild(el);
+            
+            const id = 'media_' + Date.now() + '_' + index + '_' + Math.random().toString(36).substr(2, 5);
+            App.mediaList.push({ id, type, element: el, url, name: file.name });
+            
+            if (targetMask && index === 0) {
+                saveUndo();
+                targetMask.mediaId = id;
+                if(targetMask.clonedMedia && targetMask.clonedMedia.parentNode) targetMask.clonedMedia.parentNode.removeChild(targetMask.clonedMedia);
+                targetMask.clonedMedia = cloneMediaToDOM(el, type);
+            } else if (isReplace && App.replacingMediaId) {
+                const item = App.mediaList.find(m => m.id === App.replacingMediaId);
+                if(item) {
+                    item.type = type; item.element = el; item.url = url;
+                    masks.filter(m => m.mediaId === item.id).forEach(m => {
+                        if(m.clonedMedia && m.clonedMedia.parentNode) m.clonedMedia.parentNode.removeChild(m.clonedMedia);
+                        m.clonedMedia = cloneMediaToDOM(el, type);
+                    });
+                }
+                App.replacingMediaId = null;
+                updateWorkspace();
+            } else if (App.mediaList.length === 1 && !targetMask) { 
+                App.bgMediaId = id; App.activeMediaId = id; 
+                document.getElementById('placeholder').style.display='none'; 
+                updateWorkspace();
+            }
+        });
+        renderGallery();
+    }
+
+    let lastClicks = {}; 
+    function renderGallery() {
+        const gal = document.getElementById('gallery'); gal.innerHTML = '';
+        App.mediaList.forEach(m => {
+            const thumb = document.createElement('div');
+            thumb.className = `thumb ${m.id === App.activeMediaId ? 'active' : ''}`;
+            
+            thumb.draggable = true;
+            thumb.ondragstart = (e) => {
+                e.dataTransfer.setData('text/plain', m.id);
+            };
+            
+            const mediaView = document.createElement(m.type === 'image' ? 'img' : 'video');
+            mediaView.className = 'w-full h-full object-cover';
+            mediaView.style.pointerEvents = 'none';
+            mediaView.src = m.url;
+            if(m.type === 'video') mediaView.muted = true;
+            thumb.appendChild(mediaView);
+
+            if (m.id === App.bgMediaId) {
+                const badge = document.createElement('div');
+                badge.className = 'bg-badge';
+                badge.innerText = 'BG';
+                thumb.appendChild(badge);
+            }
+
+            const btnRep = document.createElement('button'); btnRep.className = 'thumb-btn top-1 left-1'; btnRep.innerText = '🔄';
+            btnRep.onclick = (e) => { e.stopPropagation(); App.replacingMediaId = m.id; document.getElementById('replaceInput').click(); };
+            
+            const btnDel = document.createElement('button'); btnDel.className = 'thumb-btn top-1 right-1'; btnDel.innerText = '✕';
+            btnDel.onclick = (e) => {
+                e.stopPropagation();
+                showConfirm("Delete File?", "Are you sure you want to delete this media?", (isYes) => {
+                    if(isYes) {
+                        App.mediaList = App.mediaList.filter(x => x.id !== m.id);
+                        masks = masks.filter(x => x.mediaId !== m.id);
+                        if(App.bgMediaId === m.id) { App.bgMediaId = App.mediaList.length ? App.mediaList[0].id : null; updateWorkspace(); }
+                        if(App.activeMediaId === m.id) App.activeMediaId = App.mediaList.length ? App.mediaList[0].id : null;
+                        renderGallery();
+                    }
+                });
+            };
+            thumb.appendChild(btnRep); thumb.appendChild(btnDel);
+            
+            thumb.onclick = () => { 
+                const now = Date.now();
+                if (now - (lastClicks[m.id] || 0) < 300) { App.bgMediaId = m.id; lastClicks[m.id] = 0; updateWorkspace(); } 
+                else { App.activeMediaId = m.id; lastClicks[m.id] = now; }
+                renderGallery(); 
+            };
+            gal.appendChild(thumb);
+        });
+    }
+
+    let pointers = new Map();
+    let draftMask = null, selectedMask = null, selectedSubMask = null;
+    let draggedDraftPointIdx = -1;
+    let clickCount = 0, clickTimer = null;
+    let dragStartX = 0, dragStartY = 0, initScale = 1, initRot = 0, initPinchDist = 0, initPinchAngle = 0;
+    let isDragging = false, isPinching = false, transformAction = null; 
+
+    const menuHeader = document.getElementById('menuHeader');
+    let isDraggingMenu = false;
+    let menuDragOffsetX = 0, menuDragOffsetY = 0;
+    
+    menuHeader.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('#closeMenuBtn')) return;
+        isDraggingMenu = true;
+        const rect = floatingMenu.getBoundingClientRect();
+        menuDragOffsetX = e.clientX - rect.left;
+        menuDragOffsetY = e.clientY - rect.top;
+        menuHeader.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+    });
+    
+    menuHeader.addEventListener('pointermove', (e) => {
+        if(!isDraggingMenu) return;
+        const wrapperRect = canvasWrapper.getBoundingClientRect();
+        let newX = e.clientX - wrapperRect.left - menuDragOffsetX;
+        let newY = e.clientY - wrapperRect.top - menuDragOffsetY;
+        floatingMenu.style.left = `${newX}px`;
+        floatingMenu.style.top = `${newY}px`;
+        e.stopPropagation();
+    });
+    
+    menuHeader.addEventListener('pointerup', (e) => {
+        isDraggingMenu = false;
+        e.stopPropagation();
+    });
+
+    function applyTransform(ctxT, m, qs) {
+        const cx = (m.startX || 0) * qs;
+        const cy = (m.startY || 0) * qs;
+        const ox = (m.offsetX || 0) * qs;
+        const oy = (m.offsetY || 0) * qs;
+        
+        ctxT.translate(cx + ox, cy + oy);
+        ctxT.rotate((m.rotation || 0) * Math.PI/180);
+        
+        const sx = (m.scale || 1) * (m.flipX ? -1 : 1);
+        const sy = (m.scale || 1) * (m.flipY ? -1 : 1);
+        ctxT.scale(sx, sy);
+        
+        ctxT.translate(-cx, -cy);
+    }
+
+    function getInversePoint(x, y, m) {
+        const cx = m.startX;
+        const cy = m.startY;
+        const ox = m.offsetX || 0;
+        const oy = m.offsetY || 0;
+        
+        let dx = x - (cx + ox);
+        let dy = y - (cy + oy);
+        
+        const rad = -(m.rotation || 0) * Math.PI / 180;
+        let rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        let ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+        
+        rx /= ((m.scale || 1) * (m.flipX ? -1 : 1)); 
+        ry /= ((m.scale || 1) * (m.flipY ? -1 : 1));
+        
+        return { x: rx + cx, y: ry + cy };
+    }
+
+    function checkHandlesHit(lx, ly) {
+        const r = 100;
+        if (Math.hypot(lx, ly + r) < 40) return 'rotate';
+        if (Math.hypot(lx - r, ly - r) < 40) return 'scale';
+        return null;
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+        if(!App.activeMediaId || e.target.closest('#floatingMenu') || e.target.closest('#editMaskToolbar') || e.target.closest('#panMediaToolbar')) return;
+        canvas.setPointerCapture(e.pointerId);
+        
+        const rect = canvas.getBoundingClientRect();
+        const ratioX = rect.width ? App.workW / rect.width : 1;
+        const ratioY = rect.height ? App.workH / rect.height : 1;
+        const x = (e.clientX - rect.left) * ratioX;
+        const y = (e.clientY - rect.top) * ratioY;
+        
+        pointers.set(e.pointerId, { x, y });
+        const qs = App.quality;
+
+        if (App.mode === 'PAN_MEDIA') {
+            if (selectedMask) {
+                isDragging = true; dragStartX = x; dragStartY = y; transformAction = 'panMedia';
+            }
+            return;
+        }
+
+        if (App.mode === 'EDIT_MASK' && selectedMask) {
+            if (pointers.size === 2 && selectedSubMask) {
+                isDragging = false; isPinching = true; transformAction = null;
+                const pts = Array.from(pointers.values());
+                initPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                initPinchAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+                initScale = selectedSubMask.scale || 1; initRot = selectedSubMask.rotation || 0;
+                return;
+            }
+
+            const pt = getInversePoint(x, y, selectedMask); 
+            
+            if (App.activeTool === 'move') {
+                let hitSub = null;
+                if (selectedSubMask) {
+                    const ptSub = getInversePoint(pt.x, pt.y, selectedSubMask);
+                    transformAction = checkHandlesHit(ptSub.x - selectedSubMask.startX, ptSub.y - selectedSubMask.startY);
+                    if (transformAction) { isDragging = true; dragStartX = x; dragStartY = y; return; }
+                }
+                
+                if (!transformAction && selectedMask.subShapes) {
+                    for(let i = selectedMask.subShapes.length - 1; i >= 0; i--) {
+                        const sub = selectedMask.subShapes[i];
+                        ctx.save(); applyTransform(ctx, selectedMask, qs); applyTransform(ctx, sub, qs);
+                        if (sub.type === 'text') {
+                            ctx.font = `bold ${100*qs}px system-ui`;
+                            const met = ctx.measureText(sub.text), h = 100*qs;
+                            ctx.beginPath(); ctx.rect((sub.startX*qs) - met.width/2, (sub.startY*qs) - h/2, met.width, h);
+                            if(ctx.isPointInPath(x*qs, y*qs)) hitSub = sub;
+                        } else {
+                            buildPath(ctx, sub, qs);
+                            if (ctx.isPointInPath(x*qs, y*qs)) hitSub = sub;
+                        }
+                        ctx.restore();
+                        if (hitSub) break;
+                    }
+                }
+                
+                selectedSubMask = hitSub;
+                if (hitSub) { 
+                    isDragging = true; dragStartX = x; dragStartY = y; transformAction = 'move'; 
+                    if (hitSub.boolOp === 'subtract') document.getElementById('editOpSub').click();
+                    else document.getElementById('editOpAdd').click();
+                }
+                return;
+            }
+            
+            floatingMenu.classList.add('hidden');
+            if(App.shape === 'polygon') {
+                let hitIdx = -1;
+                if(draftMask && draftMask.points) {
+                    hitIdx = draftMask.points.findIndex(p => Math.hypot(pt.x - p.x, pt.y - p.y) < 25 / qs);
+                }
+                
+                if (hitIdx > -1) {
+                    draggedDraftPointIdx = hitIdx;
+                } else {
+                    if(!draftMask) {
+                        saveUndo();
+                        draftMask = createBaseMask(pt.x, pt.y); draftMask.points = [{x: pt.x, y: pt.y}];
+                        draftMask.boolOp = App.editBoolOp;
+                        document.getElementById('finishPolyBtn').classList.remove('hidden');
+                        draggedDraftPointIdx = 0;
+                    } else {
+                        draftMask.points.push({x: pt.x, y: pt.y});
+                        draggedDraftPointIdx = draftMask.points.length - 1;
+                    }
+                }
+            } else if (App.shape === 'text') {
+                showModal("Add Text", "Enter your text...", (val) => {
+                    if(val) { saveUndo(); draftMask = createBaseMask(pt.x, pt.y); draftMask.text = val; draftMask.boolOp = App.editBoolOp; finishDraft(); }
+                });
+            } else {
+                saveUndo(); draftMask = createBaseMask(pt.x, pt.y); draftMask.boolOp = App.editBoolOp;
+                if(App.shape === 'freedraw') draftMask.points = [{x: pt.x, y: pt.y}];
+            }
+        } else if (App.mode === 'DRAWING') {
+            floatingMenu.classList.add('hidden');
+            if(App.shape === 'polygon') {
+                let hitIdx = -1;
+                if(draftMask && draftMask.points) {
+                    hitIdx = draftMask.points.findIndex(p => Math.hypot(x - p.x, y - p.y) < 25 / qs);
+                }
+                
+                if (hitIdx > -1) {
+                    draggedDraftPointIdx = hitIdx;
+                } else {
+                    if(!draftMask) {
+                        saveUndo(); draftMask = createBaseMask(x, y); draftMask.points = [{x, y}];
+                        document.getElementById('finishPolyBtn').classList.remove('hidden');
+                        draggedDraftPointIdx = 0;
+                    } else {
+                        draftMask.points.push({x, y});
+                        draggedDraftPointIdx = draftMask.points.length - 1;
+                    }
+                }
+            } else if (App.shape === 'text') {
+                showModal("Add Text", "Enter your text...", (val) => {
+                    if(val) { saveUndo(); draftMask = createBaseMask(x, y); draftMask.text = val; finishDraft(); }
+                });
+            } else if (App.shape === 'template') {
+                if(App.templates.length) { saveUndo(); draftMask = createBaseMask(x, y); finishDraft(); }
+            } else {
+                saveUndo(); draftMask = createBaseMask(x, y);
+                if(App.shape === 'freedraw') draftMask.points = [{x, y}];
+            }
+        } else if (App.mode === 'MOVING') {
+            if(pointers.size === 1) {
+                if (selectedMask) {
+                    const pt = getInversePoint(x, y, selectedMask);
+                    transformAction = checkHandlesHit(pt.x - selectedMask.startX, pt.y - selectedMask.startY);
+                    if (transformAction) { isDragging = true; dragStartX = x; dragStartY = y; return; }
+                }
+
+                const hit = findHitMask(x, y);
+                if(hit) {
+                    selectedMask = hit; isDragging = true; dragStartX = x; dragStartY = y; transformAction = 'move';
+                    if (clickCount === 0) { clickCount = 1; clickTimer = setTimeout(() => { clickCount = 0; }, 250); floatingMenu.classList.add('hidden'); }
+                    else if (clickCount === 1) { clickCount = 2; clearTimeout(clickTimer); clickTimer = setTimeout(() => { clickCount = 0; showMenu(x,y); }, 250); }
+                    else if (clickCount === 2) { clickCount = 0; clearTimeout(clickTimer); handleTripleClick(hit); }
+                } else { 
+                    selectedMask = null; 
+                    if(clickTimer) { clearTimeout(clickTimer); clickCount = 0; }
+                    floatingMenu.classList.add('hidden'); 
+                }
+            } else if (pointers.size === 2 && selectedMask) {
+                isDragging = false; isPinching = true; transformAction = null;
+                const pts = Array.from(pointers.values());
+                initPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                initPinchAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+                const target = (App.mode === 'EDIT_MASK' && selectedSubMask) ? selectedSubMask : selectedMask;
+                initScale = target.scale || 1; initRot = target.rotation || 0;
+            }
+        }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+        if(!pointers.has(e.pointerId)) return;
+        const rect = canvas.getBoundingClientRect();
+        
+        const ratioX = rect.width ? App.workW / rect.width : 1;
+        const ratioY = rect.height ? App.workH / rect.height : 1;
+        const x = (e.clientX - rect.left) * ratioX;
+        const y = (e.clientY - rect.top) * ratioY;
+        
+        pointers.get(e.pointerId).x = x; pointers.get(e.pointerId).y = y;
+
+        if (draggedDraftPointIdx > -1 && draftMask && draftMask.points) {
+            if (App.mode === 'EDIT_MASK' && selectedMask) {
+                const pt = getInversePoint(x, y, selectedMask);
+                draftMask.points[draggedDraftPointIdx].x = pt.x;
+                draftMask.points[draggedDraftPointIdx].y = pt.y;
+            } else {
+                draftMask.points[draggedDraftPointIdx].x = x;
+                draftMask.points[draggedDraftPointIdx].y = y;
+            }
+        } else if(App.mode === 'EDIT_MASK' && App.activeTool === 'draw' && draftMask && App.shape !== 'polygon' && App.shape !== 'text' && App.shape !== 'template') {
+            const pt = getInversePoint(x, y, selectedMask);
+            if(App.shape === 'freedraw') draftMask.points.push({x: pt.x, y: pt.y});
+            else { draftMask.endX = pt.x; draftMask.endY = pt.y; }
+        } else if (App.mode === 'DRAWING' && draftMask && App.shape !== 'polygon' && App.shape !== 'text' && App.shape !== 'template') {
+            if(App.shape === 'freedraw') draftMask.points.push({x, y});
+            else { draftMask.endX = x; draftMask.endY = y; }
+        } else if (App.mode === 'PAN_MEDIA' && selectedMask && isDragging) {
+            let mx = x - dragStartX, my = y - dragStartY;
+            const rad = -(selectedMask.rotation || 0) * Math.PI / 180;
+            const pScale = selectedMask.scale || 1;
+            let rx = (mx * Math.cos(rad) - my * Math.sin(rad)) / pScale;
+            let ry = (mx * Math.sin(rad) + my * Math.cos(rad)) / pScale;
+            
+            selectedMask.mediaOffsetX = (selectedMask.mediaOffsetX || 0) + rx * (selectedMask.flipX ? -1 : 1);
+            selectedMask.mediaOffsetY = (selectedMask.mediaOffsetY || 0) + ry * (selectedMask.flipY ? -1 : 1);
+            dragStartX = x; dragStartY = y;
+        } else if ((App.mode === 'MOVING' || (App.mode === 'EDIT_MASK' && App.activeTool === 'move')) && (selectedMask || selectedSubMask)) {
+            const target = (App.mode === 'EDIT_MASK' && selectedSubMask) ? selectedSubMask : selectedMask;
+            
+            if(isPinching && pointers.size === 2) {
+                const pts = Array.from(pointers.values());
+                const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+                target.scale = Math.max(0.1, initScale * (dist / initPinchDist));
+                target.rotation = initRot + (angle - initPinchAngle) * (180/Math.PI);
+            } else if(isDragging && pointers.size === 1) {
+                if (transformAction === 'scale') {
+                    const dy = y - dragStartY;
+                    target.scale = Math.max(0.1, (target.scale || 1) + (dy * 0.01));
+                } else if (transformAction === 'rotate') {
+                    const dx = x - dragStartX;
+                    target.rotation = (target.rotation || 0) + dx;
+                } else if (transformAction === 'move') {
+                    let mx = x - dragStartX, my = y - dragStartY;
+                    if (target === selectedSubMask) {
+                        const rad = -(selectedMask.rotation || 0) * Math.PI / 180;
+                        const pScale = selectedMask.scale || 1;
+                        let rx = (mx * Math.cos(rad) - my * Math.sin(rad)) / pScale;
+                        let ry = (mx * Math.sin(rad) + my * Math.cos(rad)) / pScale;
+                        mx = rx; my = ry;
+                    }
+                    target.offsetX += mx; target.offsetY += my;
+                }
+                dragStartX = x; dragStartY = y;
+            }
+        }
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+        pointers.delete(e.pointerId);
+        draggedDraftPointIdx = -1;
+        if((App.mode === 'DRAWING' || (App.mode === 'EDIT_MASK' && App.activeTool === 'draw')) && draftMask && App.shape !== 'polygon' && App.shape !== 'text' && App.shape !== 'template') finishDraft();
+        if(pointers.size < 2) isPinching = false;
+        if(pointers.size === 0) { isDragging = false; transformAction = null; }
+    });
+
+    document.getElementById('finishPolyBtn').onclick = () => { if(draftMask && draftMask.points.length > 2) finishDraft(); };
+
+    function createBaseMask(x,y) {
+        if(App.shape === 'template' && App.templates.length) {
+            const tpl = JSON.parse(JSON.stringify(App.templates[App.templates.length-1]));
+            tpl.id = Date.now();
+            tpl.mediaId = App.activeMediaId;
+            const dx = x - tpl.startX;
+            const dy = y - tpl.startY;
+            tpl.offsetX += dx; tpl.offsetY += dy;
+            return tpl;
+        }
+        const m = { 
+            id: Date.now(), type: App.shape, mediaId: App.activeMediaId, 
+            startX: x, startY: y, endX: x, endY: y, offsetX: 0, offsetY: 0, 
+            mediaOffsetX: 0, mediaOffsetY: 0, mediaScale: 1,
+            scale: 1, rotation: 0, flipX: false, flipY: false, points: [], text: '', boolOp: 'normal',
+            strokeWidth: 0, strokeColor: '#ffffff'
+        };
+        if (App.shape === 'svg_mask') m.svgId = App.activeSvgId;
+        return m;
+    }
+
+    function finishDraft() {
+        if (App.mode === 'EDIT_MASK' && selectedMask) {
+            if(!selectedMask.subShapes) selectedMask.subShapes = [];
+            selectedMask.subShapes.push(JSON.parse(JSON.stringify(draftMask)));
+            selectedSubMask = selectedMask.subShapes[selectedMask.subShapes.length - 1];
+            draftMask = null;
+            document.getElementById('finishPolyBtn').classList.add('hidden');
+        } else {
+            let finalMask = JSON.parse(JSON.stringify(draftMask));
+            const src = App.mediaList.find(x => x.id === finalMask.mediaId);
+            if(src) finalMask.clonedMedia = cloneMediaToDOM(src.element, src.type);
+            masks.push(finalMask);
+            draftMask = null;
+            document.getElementById('finishPolyBtn').classList.add('hidden');
+            setMode('MOVING');
+        }
+    }
+
+    function handleTripleClick(m) {
+        const f = document.getElementById('flashOverlay'); f.classList.remove('hidden'); f.classList.add('flash-anim');
+        setTimeout(() => { f.classList.remove('flash-anim'); f.classList.add('hidden'); }, 300);
+        saveUndo();
+        const clone = JSON.parse(JSON.stringify(m));
+        clone.id = Date.now(); clone.offsetX += 40; clone.offsetY += 40;
+        const src = App.mediaList.find(x => x.id === m.mediaId);
+        if(src) clone.clonedMedia = cloneMediaToDOM(src.element, src.type);
+        masks.push(clone);
+    }
+
+    function buildPath(ctxT, m, qs) {
+        const sx = m.startX * qs;
+        const sy = m.startY * qs;
+        ctxT.beginPath();
+        if(m.type === 'square') { ctxT.rect(sx, sy, (m.endX-m.startX)*qs, (m.endY-m.startY)*qs); }
+        else if(m.type === 'circle') { ctxT.arc(sx, sy, Math.hypot((m.endX-m.startX)*qs, (m.endY-m.startY)*qs), 0, Math.PI*2); }
+        else if(m.type === 'triangle') { 
+            const w = (m.endX-m.startX)*qs, h = (m.endY-m.startY)*qs;
+            ctxT.moveTo(sx + w/2, sy); ctxT.lineTo(sx + w, sy + h); ctxT.lineTo(sx, sy + h); ctxT.closePath();
+        }
+        else if(m.type === 'polygon' || m.type === 'freedraw') {
+            if(m.points && m.points.length) {
+                ctxT.moveTo(m.points[0].x*qs, m.points[0].y*qs);
+                for(let i=1; i<m.points.length; i++) ctxT.lineTo(m.points[i].x*qs, m.points[i].y*qs);
+                if(m.type === 'polygon') ctxT.closePath();
+            }
+        }
+    }
+
+    function findHitMask(x,y) {
+        const qs = App.quality;
+        for(let i=masks.length-1; i>=0; i--) {
+            const m = masks[i]; 
+            ctx.save(); applyTransform(ctx, m, qs);
+            let hit = false;
+            
+            if(m.type === 'text') {
+                ctx.font = `bold ${100*qs}px system-ui`;
+                const met = ctx.measureText(m.text), h = 100*qs;
+                ctx.beginPath(); ctx.rect((m.startX*qs) - met.width/2, (m.startY*qs) - h/2, met.width, h);
+                if(ctx.isPointInPath(x*qs, y*qs)) hit = true;
+            } else if (m.type === 'svg_mask') {
+                ctx.beginPath(); ctx.rect(m.startX*qs, m.startY*qs, (m.endX-m.startX)*qs, (m.endY-m.startY)*qs);
+                if(ctx.isPointInPath(x*qs, y*qs)) hit = true;
+            } else { 
+                buildPath(ctx, m, qs); if(ctx.isPointInPath(x*qs, y*qs)) hit = true; 
+            }
+            
+            if(m.subShapes) {
+                for(let sub of m.subShapes) {
+                    ctx.save(); applyTransform(ctx, sub, qs);
+                    if(sub.type === 'text') {
+                        ctx.font = `bold ${100*qs}px system-ui`;
+                        const met = ctx.measureText(sub.text), h = 100*qs;
+                        ctx.beginPath(); ctx.rect((sub.startX*qs) - met.width/2, (sub.startY*qs) - h/2, met.width, h);
+                        if(ctx.isPointInPath(x*qs, y*qs)) hit = true;
+                    } else if (sub.type === 'svg_mask') {
+                        ctx.beginPath(); ctx.rect(sub.startX*qs, sub.startY*qs, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
+                        if(ctx.isPointInPath(x*qs, y*qs)) hit = true;
+                    } else {
+                        buildPath(ctx, sub, qs); if(ctx.isPointInPath(x*qs, y*qs)) hit = true;
+                    }
+                    ctx.restore();
+                }
+            }
+            ctx.restore();
+            if (hit) return m;
+        } 
+        return null;
+    }
+
+    function showMenu(x,y) {
+        if (!selectedMask) return;
+        const rect = canvas.getBoundingClientRect();
+        let screenX = (x / App.workW) * rect.width;
+        let screenY = (y / App.workH) * rect.height;
+        
+        floatingMenu.style.left = `${Math.min(screenX + 50, canvasWrapper.clientWidth - 260)}px`;
+        floatingMenu.style.top = `${Math.min(screenY + 50, canvasWrapper.clientHeight - 200)}px`;
+        floatingMenu.classList.remove('hidden');
+        
+        // Синхронизация значений обводки
+        document.getElementById('strokeColorPicker').value = selectedMask.strokeColor || '#ffffff';
+        document.getElementById('strokeWidthSlider').value = selectedMask.strokeWidth || 0;
+        document.getElementById('strokeWidthVal').innerText = selectedMask.strokeWidth || 0;
+
+        const isVid = selectedMask.clonedMedia && selectedMask.clonedMedia.tagName === 'VIDEO';
+        document.getElementById('videoControls').style.display = isVid ? 'flex' : 'none';
+        if(isVid) {
+            document.getElementById('speedSlider').value = selectedMask.clonedMedia.playbackRate;
+            document.getElementById('speedVal').innerText = selectedMask.clonedMedia.playbackRate.toFixed(1) + 'x';
+            document.getElementById('speedSlider').oninput = e => { selectedMask.clonedMedia.playbackRate = e.target.value; document.getElementById('speedVal').innerText = e.target.value + 'x'; };
+        }
+    }
+
+    document.getElementById('closeMenuBtn').onclick = (e) => { e.stopPropagation(); floatingMenu.classList.add('hidden'); };
+    document.getElementById('deleteMaskBtn').onclick = () => { if(selectedMask) masks = masks.filter(x => x !== selectedMask); selectedMask = null; floatingMenu.classList.add('hidden'); };
+    document.getElementById('layerUpBtn').onclick = () => { if(selectedMask) { const i = masks.indexOf(selectedMask); if(i < masks.length-1) { masks.splice(i,1); masks.splice(i+1, 0, selectedMask); }}};
+    document.getElementById('layerDownBtn').onclick = () => { if(selectedMask) { const i = masks.indexOf(selectedMask); if(i > 0) { masks.splice(i,1); masks.splice(i-1, 0, selectedMask); }}};
+    
+    document.getElementById('flipXBtn').onclick = () => { if(selectedMask) { saveUndo(); selectedMask.flipX = !selectedMask.flipX; } };
+    document.getElementById('flipYBtn').onclick = () => { if(selectedMask) { saveUndo(); selectedMask.flipY = !selectedMask.flipY; } };
+
+    // Управление обводкой
+    document.getElementById('strokeColorPicker').oninput = (e) => {
+        if(selectedMask) selectedMask.strokeColor = e.target.value;
+    };
+    document.getElementById('strokeWidthSlider').oninput = (e) => {
+        if(selectedMask) {
+            selectedMask.strokeWidth = parseInt(e.target.value);
+            document.getElementById('strokeWidthVal').innerText = e.target.value;
+        }
+    };
+
+    document.getElementById('panMediaBtn').onclick = () => {
+        floatingMenu.classList.add('hidden');
+        setMode('PAN_MEDIA');
+        document.getElementById('panMediaToolbar').classList.remove('hidden');
+        document.getElementById('mediaScaleSlider').value = selectedMask.mediaScale || 1;
+    };
+    
+    document.getElementById('mediaScaleSlider').oninput = (e) => {
+        if(selectedMask) selectedMask.mediaScale = parseFloat(e.target.value);
+    };
+
+    document.getElementById('panFinishBtn').onclick = () => { 
+        setMode('MOVING'); 
+        document.getElementById('panMediaToolbar').classList.add('hidden'); 
+    };
+
+    document.getElementById('editMaskBtn').onclick = () => {
+        floatingMenu.classList.add('hidden');
+        setMode('EDIT_MASK');
+        App.activeTool = 'draw'; 
+        updateToolUI();
+        document.getElementById('editMaskToolbar').classList.remove('hidden');
+        document.getElementById('editOpAdd').click(); 
+    };
+    
+    document.getElementById('editOpAdd').onclick = function() {
+        App.editBoolOp = 'add';
+        this.classList.replace('bg-neutral-800', 'bg-blue-600'); this.classList.replace('text-neutral-400', 'text-white');
+        document.getElementById('editOpSub').classList.replace('bg-red-600', 'bg-neutral-800'); document.getElementById('editOpSub').classList.replace('text-white', 'text-neutral-400');
+        if (App.mode === 'EDIT_MASK' && selectedSubMask) selectedSubMask.boolOp = 'add';
+    };
+    
+    document.getElementById('editOpSub').onclick = function() {
+        App.editBoolOp = 'subtract';
+        this.classList.replace('bg-neutral-800', 'bg-red-600'); this.classList.replace('text-neutral-400', 'text-white');
+        document.getElementById('editOpAdd').classList.replace('bg-blue-600', 'bg-neutral-800'); document.getElementById('editOpAdd').classList.replace('text-white', 'text-neutral-400');
+        if (App.mode === 'EDIT_MASK' && selectedSubMask) selectedSubMask.boolOp = 'subtract';
+    };
+    
+    document.getElementById('editFinishBtn').onclick = () => { 
+        App.mode = 'MOVING';
+        App.activeTool = 'move';
+        updateToolUI();
+        selectedSubMask = null; 
+        document.getElementById('editMaskToolbar').classList.add('hidden');
+        document.getElementById('finishPolyBtn').classList.add('hidden');
+    };
+
+    document.getElementById('saveTemplateBtn').onclick = () => {
+        if(selectedMask) showModal("Name Template", "My Shape", (name) => { 
+            if(name) {
+                const template = JSON.parse(JSON.stringify(selectedMask));
+                delete template.clonedMedia; 
+                template.name = name;
+                App.templates.push(template); 
+                localStorage.setItem('sms_templates', JSON.stringify(App.templates));
+                floatingMenu.classList.add('hidden');
+            } 
+        });
+    };
+
+    function drawMediaSafe(ctxTarget, el, x, y, w, h) {
+        if(!el) return false;
+        try {
+            if(el.tagName === 'VIDEO' && el.readyState < 2) return false; 
+            if(el.tagName === 'IMG' && (!el.complete || !el.naturalWidth)) return false; 
+            if(w !== undefined && h !== undefined) ctxTarget.drawImage(el, x, y, w, h);
+            else ctxTarget.drawImage(el, x, y);
+            return true;
+        } catch(e) { return false; }
+    }
+
+    function render(ctxTarget, qs, w, h, isExport) {
+        if (!w || !h || w === 0 || h === 0) return;
+        ctxTarget.clearRect(0, 0, w, h);
+        
+        if(App.bgMediaId) { 
+            const bg = App.mediaList.find(x=>x.id===App.bgMediaId); 
+            if(bg&&bg.element) drawMediaSafe(ctxTarget, bg.element, 0, 0, w, h); 
+        }
+
+        if(!isExport && App.activeTool === 'draw' && App.activeMediaId && App.activeMediaId !== App.bgMediaId) {
+            const act = App.mediaList.find(x=>x.id===App.activeMediaId);
+            if(act && act.element) {
+                ctxTarget.save();
+                ctxTarget.globalAlpha = 0.4;
+                drawMediaSafe(ctxTarget, act.element, 0, 0, w, h);
+                ctxTarget.restore();
+            }
+        }
+
+        const lCv = isExport ? exportLayerCanvas : previewLayerCanvas;
+        const lCtx = lCv.getContext('2d', isExport ? {} : { willReadFrequently: true });
+        lCtx.clearRect(0, 0, w, h);
+
+        const mBuf = isExport ? exportMaskBuffer : maskBuffer;
+        const mCtx = isExport ? exportMaskCtx : maskCtx;
+
+        masks.forEach(m => {
+            if(!m.clonedMedia) return;
+
+            mBuf.width = mBuf.width; 
+            mCtx.clearRect(0,0,w,h);
+            
+            mCtx.save();
+            applyTransform(mCtx, m, qs);
+            
+            mCtx.fillStyle = '#fff';
+            mCtx.beginPath();
+            if(m.type === 'text') {
+                mCtx.font = `bold ${100*qs}px system-ui`; mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
+                mCtx.fillText(m.text, m.startX*qs, m.startY*qs);
+            } else if (m.type === 'svg_mask') {
+                const svgItem = App.svgMasks.find(s => s.id === m.svgId);
+                if(svgItem) mCtx.drawImage(svgItem.img, m.startX*qs, m.startY*qs, (m.endX-m.startX)*qs, (m.endY-m.startY)*qs);
+            } else {
+                buildPath(mCtx, m, qs);
+                mCtx.fill();
+            }
+
+            if(m.subShapes) {
+                m.subShapes.forEach(sub => {
+                    mCtx.save();
+                    applyTransform(mCtx, sub, qs);
+                    mCtx.globalCompositeOperation = sub.boolOp === 'subtract' ? 'destination-out' : 'source-over';
+                    mCtx.fillStyle = sub.boolOp === 'subtract' ? '#000' : '#fff';
+                    mCtx.beginPath();
+                    if(sub.type === 'text') {
+                        mCtx.font = `bold ${100*qs}px system-ui`; mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
+                        mCtx.fillText(sub.text, (sub.startX*qs), (sub.startY*qs));
+                    } else if (sub.type === 'svg_mask') {
+                        const svgItem = App.svgMasks.find(s => s.id === sub.svgId);
+                        if(svgItem) mCtx.drawImage(svgItem.img, sub.startX*qs, sub.startY*qs, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
+                    } else {
+                        buildPath(mCtx, sub, qs);
+                        mCtx.fill();
+                    }
+                    mCtx.restore();
+                });
+            }
+            
+            mCtx.globalCompositeOperation = 'source-in';
+            mCtx.save();
+            
+            const mScale = m.mediaScale || 1;
+            const maskCx = m.startX * qs;
+            const maskCy = m.startY * qs;
+            
+            mCtx.translate(maskCx, maskCy);
+            mCtx.scale(mScale, mScale);
+            mCtx.translate(-maskCx, -maskCy);
+            
+            mCtx.translate((m.mediaOffsetX || 0) * qs, (m.mediaOffsetY || 0) * qs);
+            
+            const mediaDrawn = drawMediaSafe(mCtx, m.clonedMedia, 0, 0, w, h);
+            mCtx.restore();
+            
+            // Наложение обводки (Stroke) поверх готовой маски с видео
+            mCtx.globalCompositeOperation = 'source-over';
+            if (m.strokeWidth > 0) {
+                mCtx.strokeStyle = m.strokeColor || '#ffffff';
+                mCtx.lineWidth = m.strokeWidth * qs;
+                mCtx.lineJoin = 'round';
+                
+                mCtx.beginPath();
+                if(m.type === 'text') {
+                    mCtx.strokeText(m.text, m.startX*qs, m.startY*qs);
+                } else if (m.type === 'svg_mask') {
+                    mCtx.strokeRect(m.startX*qs, m.startY*qs, (m.endX-m.startX)*qs, (m.endY-m.startY)*qs);
+                } else {
+                    buildPath(mCtx, m, qs);
+                    mCtx.stroke();
+                }
+
+                if (m.subShapes) {
+                    m.subShapes.forEach(sub => {
+                        mCtx.save();
+                        applyTransform(mCtx, sub, qs);
+                        mCtx.beginPath();
+                        if(sub.type === 'text') {
+                            mCtx.strokeText(sub.text, (sub.startX*qs), (sub.startY*qs));
+                        } else if (sub.type === 'svg_mask') {
+                            mCtx.strokeRect(sub.startX*qs, sub.startY*qs, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
+                        } else {
+                            buildPath(mCtx, sub, qs);
+                            mCtx.stroke();
+                        }
+                        mCtx.restore();
+                    });
+                }
+            }
+            
+            mCtx.restore();
+
+            if (!mediaDrawn) mCtx.clearRect(0,0,w,h);
+
+            if (mBuf.width > 0 && mBuf.height > 0) lCtx.drawImage(mBuf, 0, 0); 
+        });
+
+        if (lCv.width > 0 && lCv.height > 0) ctxTarget.drawImage(lCv, 0, 0, w, h);
+    }
+
+    function drawUIOverlays(ctxTarget, qs) {
+        if(selectedMask) {
+            ctxTarget.save(); 
+            applyTransform(ctxTarget, selectedMask, qs);
+            const cx = selectedMask.startX * qs;
+            const cy = selectedMask.startY * qs;
+
+            if (App.mode === 'MOVING') {
+                ctxTarget.strokeStyle = 'rgba(255,255,255,0.5)'; ctxTarget.setLineDash([5*qs,5*qs]); ctxTarget.lineWidth = 2*qs;
+                ctxTarget.strokeRect(cx - 100*qs, cy - 100*qs, 200*qs, 200*qs);
+                ctxTarget.setLineDash([]);
+                
+                ctxTarget.fillStyle = '#fff'; ctxTarget.strokeStyle = '#3b82f6'; ctxTarget.lineWidth = 4*qs;
+                ctxTarget.beginPath(); ctxTarget.arc(cx, cy - 100*qs, 20*qs, 0, Math.PI*2); ctxTarget.fill(); ctxTarget.stroke();
+                ctxTarget.fillRect(cx + 100*qs - 20*qs, cy + 100*qs - 20*qs, 40*qs, 40*qs);
+                ctxTarget.strokeRect(cx + 100*qs - 20*qs, cy + 100*qs - 20*qs, 40*qs, 40*qs);
+            }
+
+            ctxTarget.strokeStyle = '#3b82f6'; ctxTarget.lineWidth = 4*qs;
+            ctxTarget.beginPath();
+            if(selectedMask.type === 'text') {
+                ctxTarget.font = `bold ${100*qs}px system-ui`; ctxTarget.textAlign = 'center'; ctxTarget.textBaseline = 'middle';
+                ctxTarget.strokeText(selectedMask.text, cx, cy);
+            } else if (selectedMask.type === 'svg_mask') {
+                ctxTarget.strokeRect(cx, cy, (selectedMask.endX-selectedMask.startX)*qs, (selectedMask.endY-selectedMask.startY)*qs);
+            } else { buildPath(ctxTarget, selectedMask, qs); ctxTarget.stroke(); }
+            
+            if(selectedMask.subShapes) {
+                selectedMask.subShapes.forEach(sub => {
+                    ctxTarget.save(); applyTransform(ctxTarget, sub, qs);
+                    ctxTarget.strokeStyle = (App.mode === 'EDIT_MASK' && selectedSubMask === sub) ? '#fbbf24' : (sub.boolOp === 'subtract' ? '#ef4444' : '#10b981');
+                    ctxTarget.lineWidth = (App.mode === 'EDIT_MASK' && selectedSubMask === sub) ? 4*qs : 2*qs;
+                    
+                    const scx = (sub.startX * qs);
+                    const scy = (sub.startY * qs);
+
+                    if (App.mode === 'EDIT_MASK' && selectedSubMask === sub) {
+                        ctxTarget.strokeStyle = 'rgba(255,255,255,0.5)'; ctxTarget.setLineDash([5*qs,5*qs]); ctxTarget.lineWidth = 2*qs;
+                        ctxTarget.strokeRect(scx - 100*qs, scy - 100*qs, 200*qs, 200*qs);
+                        ctxTarget.setLineDash([]);
+
+                        ctxTarget.fillStyle = '#fbbf24'; ctxTarget.strokeStyle = '#000'; ctxTarget.lineWidth = 2*qs;
+                        ctxTarget.beginPath(); ctxTarget.arc(scx, scy - 100*qs, 20*qs, 0, Math.PI*2); ctxTarget.fill(); ctxTarget.stroke();
+                        ctxTarget.fillRect(scx + 100*qs - 20*qs, scy + 100*qs - 20*qs, 40*qs, 40*qs);
+                        ctxTarget.strokeRect(scx + 100*qs - 20*qs, scy + 100*qs - 20*qs, 40*qs, 40*qs);
+
+                        ctxTarget.strokeStyle = '#fbbf24'; ctxTarget.lineWidth = 4*qs;
+                    }
+
+                    ctxTarget.beginPath();
+                    if(sub.type === 'text') {
+                        ctxTarget.font = `bold ${100*qs}px system-ui`; ctxTarget.textAlign = 'center'; ctxTarget.textBaseline = 'middle';
+                        ctxTarget.strokeText(sub.text, scx, scy);
+                    } else if (sub.type === 'svg_mask') {
+                        ctxTarget.strokeRect(scx, scy, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
+                    } else { buildPath(ctxTarget, sub, qs); ctxTarget.stroke(); }
+                    ctxTarget.restore();
+                });
+            }
+            ctxTarget.restore();
+        }
+
+        if(draftMask) {
+            ctxTarget.save(); 
+            if(App.mode === 'EDIT_MASK' && selectedMask) {
+                applyTransform(ctxTarget, selectedMask, qs);
+                applyTransform(ctxTarget, draftMask, qs);
+                ctxTarget.strokeStyle = draftMask.boolOp === 'subtract' ? '#ef4444' : '#10b981';
+            } else {
+                applyTransform(ctxTarget, draftMask, qs);
+                ctxTarget.strokeStyle = '#fff';
+            }
+            
+            ctxTarget.lineWidth = 3*qs; ctxTarget.setLineDash([8*qs,8*qs]); ctxTarget.beginPath();
+            
+            if(draftMask.type === 'text') {
+                ctxTarget.font = `bold ${100*qs}px system-ui`; ctxTarget.textAlign = 'center'; ctxTarget.textBaseline = 'middle';
+                ctxTarget.strokeText(draftMask.text, draftMask.startX*qs, draftMask.startY*qs);
+            } else if (draftMask.type === 'svg_mask') {
+                ctxTarget.strokeRect(draftMask.startX*qs, draftMask.startY*qs, (draftMask.endX-draftMask.startX)*qs, (draftMask.endY-draftMask.startY)*qs);
+            } else {
+                buildPath(ctxTarget, draftMask, qs);
+                ctxTarget.stroke();
+            }
+            
+            if (draftMask.type === 'polygon' && draftMask.points) {
+                ctxTarget.setLineDash([]);
+                ctxTarget.lineWidth = 2 * qs;
+                draftMask.points.forEach((p, index) => {
+                    ctxTarget.beginPath();
+                    if (index === 0) {
+                        ctxTarget.fillStyle = '#10b981';
+                        ctxTarget.arc(p.x * qs, p.y * qs, 8 * qs, 0, Math.PI * 2);
+                    } else {
+                        ctxTarget.fillStyle = '#3b82f6';
+                        ctxTarget.arc(p.x * qs, p.y * qs, 5 * qs, 0, Math.PI * 2);
+                    }
+                    ctxTarget.fill();
+                    ctxTarget.stroke();
+                });
+            }
+            
+            ctxTarget.restore();
+        }
+    }
+
+    let lastRenderTime = 0;
+    const exportFpsInterval = 1000 / 30; // Лимит в 30 FPS для экспорта
+
+    function loop(now) {
+        requestAnimationFrame(loop);
+        
+        if (isRecording) {
+            if (now - lastRenderTime < exportFpsInterval) return;
+            lastRenderTime = now;
+            
+            render(exportCtx, 1.0, exportCanvas.width, exportCanvas.height, true);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(exportCanvas, 0, 0, canvas.width, canvas.height);
+            drawUIOverlays(ctx, App.quality);
+        } else {
+            render(ctx, App.quality, canvas.width, canvas.height, false);
+            drawUIOverlays(ctx, App.quality);
+        }
+    }
+
+    let recordingTimeout = null;
+
+    function stopRecording() {
+        if (!isRecording || !mediaRecorder) return;
+        mediaRecorder.stop(); 
+        isRecording = false; 
+        document.getElementById('recDot').classList.add('hidden');
+        if (recordingTimeout) clearTimeout(recordingTimeout);
+    }
+
+    function startRecording(durationSeconds = 0) {
+        if(isRecording) return;
+        try {
+            const stream = exportCanvas.captureStream(30);
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const opts = { mimeType: isSafari ? 'video/mp4' : 'video/webm;codecs=vp8', videoBitsPerSecond: 8000000 };
+            
+            try { mediaRecorder = new MediaRecorder(stream, opts); } 
+            catch(e) { mediaRecorder = new MediaRecorder(stream); }
+
+            recordedChunks = [];
+            mediaRecorder.ondataavailable = e => { if(e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const type = mediaRecorder.mimeType || 'video/webm';
+                const ext = type.includes('mp4') ? 'mp4' : 'webm';
+                const blob = new Blob(recordedChunks, { type });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
+                a.download = `VJMix_${Date.now()}.${ext}`; a.click();
+            };
+            mediaRecorder.start(); 
+            isRecording = true; 
+            document.getElementById('recDot').classList.remove('hidden');
+
+            if (durationSeconds > 0) {
+                recordingTimeout = setTimeout(stopRecording, durationSeconds * 1000);
+            }
+        } catch(e) { console.error("Export Error:", e); }
+    }
+
+    document.getElementById('recordBtn').onclick = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            document.getElementById('exportModal').classList.remove('hidden');
+        }
+    };
+
+    document.getElementById('exportCancel').onclick = () => document.getElementById('exportModal').classList.add('hidden');
+    
+    document.getElementById('recModeManual').onclick = () => {
+        document.getElementById('exportModal').classList.add('hidden');
+        startRecording(0);
+    };
+
+    document.getElementById('recModeBg').onclick = () => {
+        document.getElementById('exportModal').classList.add('hidden');
+        let dur = 0;
+        if (App.bgMediaId) {
+            const bg = App.mediaList.find(x => x.id === App.bgMediaId);
+            if (bg && bg.element && bg.element.duration && bg.element.duration !== Infinity) dur = bg.element.duration;
+        }
+        if (dur > 0) {
+            App.mediaList.forEach(m => {
+                if (m.type === 'video' && m.element) m.element.currentTime = 0;
+            });
+            masks.forEach(m => {
+                if (m.clonedMedia && m.clonedMedia.tagName === 'VIDEO') m.clonedMedia.currentTime = 0;
+            });
+            startRecording(dur);
+        } else {
+            showModal("Error", "No background video duration found.", () => {});
+        }
+    };
+
+    document.getElementById('recModeCustom').onclick = () => {
+        document.getElementById('exportModal').classList.add('hidden');
+        showModal("Duration (sec)", "e.g. 15", (val) => {
+            const dur = parseFloat(val);
+            if (!isNaN(dur) && dur > 0) {
+                startRecording(dur);
+            }
+        });
+    };
+
+    setTimeout(updateWorkspace, 100); 
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>
