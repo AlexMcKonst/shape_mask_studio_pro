@@ -6,8 +6,6 @@
     <title>Shape Mask Studio Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --app-height: 100vh; }
-        
         * {
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
@@ -16,11 +14,11 @@
         }
 
         body { 
-            margin: 0; padding: 0; width: 100vw; height: 100vh; height: var(--app-height); overflow: hidden; 
+            margin: 0; padding: 0; width: 100vw; height: 100dvh; overflow: hidden; 
             background-color: #050505; color: #fff; font-family: system-ui, -apple-system, sans-serif; 
             touch-action: none; 
         }
-        .app-container { display: flex; width: 100%; height: 100vh; height: var(--app-height); }
+        .app-container { display: flex; width: 100%; height: 100dvh; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .cursor-draw { cursor: crosshair; }
@@ -50,10 +48,6 @@
 </head>
 <body>
 
-<script>
-    function setAppHeight() { document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`); }
-</script>
-
 <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-[100] hidden"></div>
 
 <div id="inputModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center">
@@ -74,6 +68,16 @@
         <div class="flex justify-end gap-2 mt-2">
             <button id="confirmNo" class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm">No</button>
             <button id="confirmYes" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-sm font-medium">Yes</button>
+        </div>
+    </div>
+</div>
+
+<div id="alertModal" class="absolute inset-0 bg-black/80 backdrop-blur-sm z-[200] hidden flex items-center justify-center">
+    <div class="bg-neutral-900 border border-neutral-700 p-6 rounded-2xl shadow-2xl w-80 flex flex-col gap-4">
+        <h3 id="alertTitle" class="text-lg font-semibold text-white">Info</h3>
+        <p id="alertMessage" class="text-sm text-neutral-300 whitespace-pre-line"></p>
+        <div class="flex justify-end mt-2">
+            <button id="alertOk" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium">OK</button>
         </div>
     </div>
 </div>
@@ -111,7 +115,6 @@
 </div>
 
 <div class="app-container flex-col md:flex-row">
-    <!-- Для воспроизведения GIF-анимаций контейнер фиксируется на 100px с opacity: 0.001, чтобы браузер не ставил их на паузу -->
     <div id="mediaBin" class="absolute w-[100px] h-[100px] overflow-hidden pointer-events-none -z-10" style="top:0; left:0; opacity: 0.001;"></div>
     
     <input type="file" id="fileInput" accept="image/*,video/*" multiple class="hidden" />
@@ -134,8 +137,10 @@
             
             <!-- Toolbar for Boolean Mask Editing -->
             <div id="editMaskToolbar" class="absolute top-4 left-1/2 -translate-x-1/2 bg-neutral-900/95 backdrop-blur-md border border-neutral-700 p-2 rounded-xl shadow-2xl z-40 hidden flex gap-2">
-                <button id="editOpAdd" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">+ Add</button>
-                <button id="editOpSub" class="bg-neutral-800 text-neutral-400 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">- Sub</button>
+                <button id="editOpAdd" class="bg-neutral-800 text-neutral-400 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">+ Add</button>
+                <button id="editOpSub" class="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">- Sub</button>
+                <div class="w-px h-6 bg-neutral-700 mx-1 self-center"></div>
+                <button id="editOpDel" class="bg-red-900/60 hover:bg-red-800 text-red-300 px-3 py-1.5 rounded text-xs font-bold transition-colors" title="Delete Selected Part">🗑️</button>
                 <div class="w-px h-6 bg-neutral-700 mx-1 self-center"></div>
                 <button id="editFinishBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">Done</button>
             </div>
@@ -178,21 +183,36 @@
                     <button id="flipYBtn" class="bg-neutral-800 hover:bg-neutral-700 px-2 py-1.5 rounded text-xs flex-1">↕️ Flip Y</button>
                 </div>
 
-                <!-- Строка настройки контура (Stroke) -->
-                <div class="flex items-center gap-2 mt-1 bg-neutral-800/50 p-1.5 rounded">
-                    <span class="text-[10px] text-neutral-400 uppercase w-12 font-bold tracking-wider">Border</span>
-                    <input type="color" id="strokeColorPicker" value="#ffffff" class="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent" title="Border Color">
-                    <input type="range" id="strokeWidthSlider" min="0" max="50" value="0" class="flex-1" title="Border Width">
-                    <span id="strokeWidthVal" class="text-[10px] text-neutral-400 w-4 text-right">0</span>
+                <div class="flex flex-col gap-2 mt-1 bg-neutral-800/50 p-2 rounded">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">Border</span>
+                            <input type="color" id="strokeColorPicker" value="#ffffff" class="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent" title="Border Color">
+                        </div>
+                        <button id="strokeOrderBtn" class="text-[10px] bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded text-white font-bold" title="Toggle Stroke Order">🔲 Outer</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="range" id="strokeWidthSlider" min="0" max="50" value="0" class="flex-1" title="Border Width">
+                        <span id="strokeWidthVal" class="text-[10px] text-neutral-400 w-4 text-right">0</span>
+                    </div>
                 </div>
 
-                <button id="panMediaBtn" class="bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 w-full py-1.5 rounded text-xs font-bold border border-amber-800/50 mt-1">🔀 Pan Media</button>
-                <button id="replaceMaskMediaBtn" class="bg-blue-900/40 text-blue-300 hover:bg-blue-900/60 w-full py-1.5 rounded text-xs font-bold border border-blue-800/50 mt-1">🖼️ Replace Media</button>
+                <button id="editTextBtn" class="bg-blue-900/40 text-blue-300 hover:bg-blue-900/60 w-full py-1.5 rounded text-xs font-bold border border-blue-800/50 mt-1 hidden">📝 Edit Text</button>
+                <div class="flex gap-2 mt-1">
+                    <button id="panMediaBtn" class="bg-amber-900/40 text-amber-300 hover:bg-amber-900/60 flex-1 py-1.5 rounded text-xs font-bold border border-amber-800/50">🔀 Pan</button>
+                    <button id="replaceMaskMediaBtn" class="bg-blue-900/40 text-blue-300 hover:bg-blue-900/60 flex-1 py-1.5 rounded text-xs font-bold border border-blue-800/50">🖼️ Replace</button>
+                </div>
                 <button id="editMaskBtn" class="bg-purple-900/40 text-purple-300 hover:bg-purple-900/60 w-full py-1.5 rounded text-xs font-bold uppercase border border-purple-800/50 mt-1">✏️ Edit Shape (+/-)</button>
                 <button id="saveTemplateBtn" class="bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60 w-full py-1.5 rounded text-xs font-medium border border-emerald-800/50 mt-1">💾 Save Template</button>
 
-                <div id="videoControls" class="flex flex-col gap-2 mt-1 hidden">
-                    <div class="flex justify-between text-[10px] text-neutral-400 uppercase"><span>Speed</span><span id="speedVal">1.0x</span></div>
+                <div id="videoControls" class="flex flex-col gap-2 mt-1 hidden bg-neutral-800/40 p-2 rounded">
+                    <div class="flex justify-between items-center text-[10px] text-neutral-400 uppercase">
+                        <span>Mask Video Speed</span>
+                        <div class="flex items-center gap-2">
+                            <span id="speedVal">1.0x</span>
+                            <button id="maskPlayPauseBtn" class="bg-neutral-700 hover:bg-neutral-600 px-2 py-0.5 rounded text-white text-xs">⏸️</button>
+                        </div>
+                    </div>
                     <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
                 </div>
             </div>
@@ -234,6 +254,13 @@
 </div>
 
 <script>
+    function showAlert(title, message) {
+        document.getElementById('alertTitle').innerText = title;
+        document.getElementById('alertMessage').innerText = message;
+        document.getElementById('alertModal').classList.remove('hidden');
+    }
+    document.getElementById('alertOk').onclick = () => document.getElementById('alertModal').classList.add('hidden');
+
     let modalCallback = null;
     function showModal(title, placeholder, cb) {
         document.getElementById('modalTitle').innerText = title;
@@ -301,10 +328,12 @@
             const div = document.createElement('div');
             div.className = `w-16 h-16 bg-neutral-800 rounded-lg cursor-pointer flex items-center justify-center p-2 border-2 ${App.activeSvgId === svg.id ? 'border-blue-500' : 'border-transparent'} hover:border-blue-400 transition-colors`;
             
-            // Drag and Drop (для перетаскивания иконок из меню)
             div.draggable = true;
             div.ondragstart = (e) => {
-                e.dataTransfer.setData('text/svg-id', svg.id);
+                e.dataTransfer.setData('text/plain', 'svg|' + svg.id);
+                setTimeout(() => {
+                    document.getElementById('svgLibraryModal').classList.replace('flex', 'hidden');
+                }, 10);
             };
 
             div.innerHTML = `<img src="${svg.url}" class="max-w-full max-h-full object-contain pointer-events-none" />`;
@@ -323,13 +352,15 @@
         if (savedTemplates) App.templates = JSON.parse(savedTemplates);
     } catch(e) { console.error("Error loading templates:", e); }
 
-    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d'); // Optimized: removed willReadFrequently
     
     const exportCanvas = document.createElement('canvas'), exportCtx = exportCanvas.getContext('2d');
     const previewLayerCanvas = document.createElement('canvas'); 
     const exportLayerCanvas = document.createElement('canvas');  
-    const maskBuffer = document.createElement('canvas'), maskCtx = maskBuffer.getContext('2d', { willReadFrequently: true }); 
+    const maskBuffer = document.createElement('canvas'), maskCtx = maskBuffer.getContext('2d'); // Optimized: removed willReadFrequently
     const exportMaskBuffer = document.createElement('canvas'), exportMaskCtx = exportMaskBuffer.getContext('2d'); 
+    const contourCanvas = document.createElement('canvas'), contourCtx = contourCanvas.getContext('2d'); 
+    const contourBgCanvas = document.createElement('canvas'), contourBgCtx = contourBgCanvas.getContext('2d'); 
     
     const canvasWrapper = document.getElementById('canvasWrapper');
     const floatingMenu = document.getElementById('floatingMenu');
@@ -377,8 +408,8 @@
         exportMaskBuffer.width = App.workW; exportMaskBuffer.height = App.workH;
     }
 
-    window.addEventListener('resize', () => { setAppHeight(); resizeCanvas(); }); 
-    window.addEventListener('orientationchange', () => { setAppHeight(); resizeCanvas(); });
+    window.addEventListener('resize', resizeCanvas); 
+    window.addEventListener('orientationchange', resizeCanvas);
 
     function cloneMediaToDOM(srcEl, type) {
         if(!srcEl) return null;
@@ -409,7 +440,7 @@
 
     document.getElementById('saveProjBtn').onclick = () => {
         const exportData = {
-            version: 1.9,
+            version: 2.0,
             templates: App.templates,
             masks: masks.map(m => {
                 const copy = JSON.parse(JSON.stringify(m)); 
@@ -486,6 +517,13 @@
 
             document.querySelectorAll('.btn-shape').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            
+            if (draftMask) {
+                draftMask = null;
+                draggedDraftPointIdx = -1;
+                document.getElementById('finishPolyBtn').classList.add('hidden');
+            }
+
             App.shape = shape;
             if(App.mode !== 'EDIT_MASK') setMode('DRAWING');
             if(App.shape === 'template' && App.templates.length === 0) {
@@ -544,11 +582,17 @@
         canvasWrapper.classList.toggle('cursor-move', App.activeTool === 'move');
     }
 
-    function setMode(mode) {
-        if (App.mode === 'EDIT_MASK' && (mode === 'DRAWING' || mode === 'MOVING')) {
+    function setMode(mode, forceExitEdit = false) {
+        if (!forceExitEdit && App.mode === 'EDIT_MASK' && (mode === 'DRAWING' || mode === 'MOVING')) {
             App.activeTool = mode === 'DRAWING' ? 'draw' : 'move';
             updateToolUI();
             return;
+        }
+
+        if (draftMask) {
+            draftMask = null;
+            draggedDraftPointIdx = -1;
+            document.getElementById('finishPolyBtn').classList.add('hidden');
         }
 
         App.mode = mode;
@@ -588,6 +632,9 @@
                 else { m.clonedMedia.pause(); }
             }
         });
+        
+        const maskPlayBtn = document.getElementById('maskPlayPauseBtn');
+        if (maskPlayBtn) maskPlayBtn.innerText = App.isPlaying ? '⏸️' : '▶️';
     };
 
     document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
@@ -600,7 +647,11 @@
         e.target.value = '';
     };
 
-    canvasWrapper.addEventListener('dragover', e => e.preventDefault());
+    canvasWrapper.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+    
     canvasWrapper.addEventListener('drop', e => {
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
@@ -625,10 +676,10 @@
                 handleFiles(mediaFiles, false, hit);
             }
         } else {
-            const svgId = e.dataTransfer.getData('text/svg-id');
-            if (svgId) {
-                // Дроп вектора из библиотеки
-                document.getElementById('svgLibraryModal').classList.replace('flex', 'hidden');
+            const textData = e.dataTransfer.getData('text/plain');
+            
+            if (textData && textData.startsWith('svg|')) {
+                const svgId = textData.split('|')[1];
                 App.activeSvgId = svgId;
                 App.shape = 'svg_mask';
                 
@@ -647,18 +698,17 @@
                 return;
             }
 
-            const mediaId = e.dataTransfer.getData('text/plain');
-            if (mediaId) {
+            if (textData) {
                 if (hit) {
                     saveUndo();
-                    const src = App.mediaList.find(m => m.id === mediaId);
+                    const src = App.mediaList.find(m => m.id === textData);
                     if (src) {
-                        hit.mediaId = mediaId;
+                        hit.mediaId = textData;
                         if(hit.clonedMedia && hit.clonedMedia.parentNode) hit.clonedMedia.parentNode.removeChild(hit.clonedMedia);
                         hit.clonedMedia = cloneMediaToDOM(src.element, src.type);
                     }
                 } else {
-                    App.bgMediaId = mediaId;
+                    App.bgMediaId = textData;
                     updateWorkspace();
                 }
                 renderGallery();
@@ -755,6 +805,18 @@
             };
             thumb.appendChild(btnRep); thumb.appendChild(btnDel);
             
+            if (m.id === App.bgMediaId && m.type === 'video') {
+                const btnPause = document.createElement('button'); 
+                btnPause.className = 'thumb-btn bottom-1 left-1';
+                btnPause.innerText = m.element.paused ? '▶️' : '⏸️';
+                btnPause.onclick = (e) => {
+                    e.stopPropagation();
+                    if(m.element.paused) { m.element.play(); btnPause.innerText = '⏸️'; }
+                    else { m.element.pause(); btnPause.innerText = '▶️'; }
+                };
+                thumb.appendChild(btnPause);
+            }
+
             thumb.onclick = () => { 
                 const now = Date.now();
                 if (now - (lastClicks[m.id] || 0) < 300) { App.bgMediaId = m.id; lastClicks[m.id] = 0; updateWorkspace(); } 
@@ -769,7 +831,8 @@
     let draftMask = null, selectedMask = null, selectedSubMask = null;
     let draggedDraftPointIdx = -1;
     let clickCount = 0, clickTimer = null;
-    let dragStartX = 0, dragStartY = 0, initScale = 1, initRot = 0, initPinchDist = 0, initPinchAngle = 0;
+    let dragStartX = 0, dragStartY = 0, initScale = 1, initRot = 0;
+    let dragStartDist = 0, dragStartAngle = 0;
     let isDragging = false, isPinching = false, transformAction = null; 
 
     const menuHeader = document.getElementById('menuHeader');
@@ -835,11 +898,80 @@
         
         return { x: rx + cx, y: ry + cy };
     }
+    
+    function getBoundingBox(m, qs) {
+        let minX = 0, minY = 0, maxX = 0, maxY = 0;
+        
+        if (m.type === 'text') {
+            ctx.font = `bold ${100*qs}px system-ui`;
+            const met = ctx.measureText(m.text);
+            const w = met.width, h = 100*qs;
+            minX = (m.startX * qs) - w/2; 
+            maxX = (m.startX * qs) + w/2; 
+            minY = (m.startY * qs) - h/2; 
+            maxY = (m.startY * qs) + h/2;
+        } else if (m.type === 'polygon' || m.type === 'freedraw') {
+            if (m.points && m.points.length) {
+                let pxs = m.points.map(p => p.x * qs);
+                let pys = m.points.map(p => p.y * qs);
+                minX = Math.min(...pxs); maxX = Math.max(...pxs);
+                minY = Math.min(...pys); maxY = Math.max(...pys);
+            }
+        } else {
+            minX = m.startX * qs; maxX = m.endX * qs;
+            minY = m.startY * qs; maxY = m.endY * qs;
+            
+            if (maxX < minX) { let t = minX; minX = maxX; maxX = t; }
+            if (maxY < minY) { let t = minY; minY = maxY; maxY = t; }
+            
+            if (m.type === 'circle') {
+                const r = Math.hypot((m.endX - m.startX)*qs, (m.endY - m.startY)*qs);
+                minX = (m.startX * qs) - r; maxX = (m.startX * qs) + r; 
+                minY = (m.startY * qs) - r; maxY = (m.startY * qs) + r;
+            }
+        }
+        
+        const pad = 10 * qs;
+        return { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad*2, h: (maxY - minY) + pad*2 };
+    }
 
-    function checkHandlesHit(lx, ly) {
-        const r = 100;
-        if (Math.hypot(lx, ly + r) < 40) return 'rotate';
-        if (Math.hypot(lx - r, ly - r) < 40) return 'scale';
+    function getAbsoluteAnchor(mask, parentMask, qs) {
+        let cx = (mask.startX + (mask.offsetX || 0)) * qs;
+        let cy = (mask.startY + (mask.offsetY || 0)) * qs;
+        
+        if (parentMask) {
+            const pcx = (parentMask.startX + (parentMask.offsetX || 0)) * qs;
+            const pcy = (parentMask.startY + (parentMask.offsetY || 0)) * qs;
+            
+            let dx = cx - pcx;
+            let dy = cy - pcy;
+            
+            const rad = (parentMask.rotation || 0) * Math.PI / 180;
+            const sx = (parentMask.scale || 1) * (parentMask.flipX ? -1 : 1);
+            const sy = (parentMask.scale || 1) * (parentMask.flipY ? -1 : 1);
+            
+            let rx = dx * sx * Math.cos(rad) - dy * sy * Math.sin(rad);
+            let ry = dx * sx * Math.sin(rad) + dy * sy * Math.cos(rad);
+            
+            cx = rx + pcx;
+            cy = ry + pcy;
+        }
+        return { x: cx, y: cy };
+    }
+
+    function checkHandlesHit(lx, ly, bbox, qs) {
+        const hr = 18 * qs; 
+        
+        if (Math.hypot(lx - bbox.x, ly - bbox.y) < hr) return 'scale';
+        if (Math.hypot(lx - (bbox.x + bbox.w), ly - bbox.y) < hr) return 'scale';
+        if (Math.hypot(lx - bbox.x, ly - (bbox.y + bbox.h)) < hr) return 'scale';
+        if (Math.hypot(lx - (bbox.x + bbox.w), ly - (bbox.y + bbox.h)) < hr) return 'scale';
+        
+        if (Math.hypot(lx - (bbox.x + bbox.w/2), ly - bbox.y) < hr) return 'rotate';
+        if (Math.hypot(lx - (bbox.x + bbox.w/2), ly - (bbox.y + bbox.h)) < hr) return 'rotate';
+        if (Math.hypot(lx - bbox.x, ly - (bbox.y + bbox.h/2)) < hr) return 'rotate';
+        if (Math.hypot(lx - (bbox.x + bbox.w), ly - (bbox.y + bbox.h/2)) < hr) return 'rotate';
+        
         return null;
     }
 
@@ -867,8 +999,7 @@
             if (pointers.size === 2 && selectedSubMask) {
                 isDragging = false; isPinching = true; transformAction = null;
                 const pts = Array.from(pointers.values());
-                initPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-                initPinchAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+                dragStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
                 initScale = selectedSubMask.scale || 1; initRot = selectedSubMask.rotation || 0;
                 return;
             }
@@ -879,8 +1010,17 @@
                 let hitSub = null;
                 if (selectedSubMask) {
                     const ptSub = getInversePoint(pt.x, pt.y, selectedSubMask);
-                    transformAction = checkHandlesHit(ptSub.x - selectedSubMask.startX, ptSub.y - selectedSubMask.startY);
-                    if (transformAction) { isDragging = true; dragStartX = x; dragStartY = y; return; }
+                    const bbox = getBoundingBox(selectedSubMask, qs);
+                    transformAction = checkHandlesHit(ptSub.x * qs, ptSub.y * qs, bbox, qs);
+                    if (transformAction) { 
+                        isDragging = true; dragStartX = x; dragStartY = y; 
+                        const anchor = getAbsoluteAnchor(selectedSubMask, selectedMask, qs);
+                        dragStartDist = Math.hypot(x - anchor.x, y - anchor.y);
+                        dragStartAngle = Math.atan2(y - anchor.y, x - anchor.x);
+                        initScale = selectedSubMask.scale || 1;
+                        initRot = selectedSubMask.rotation || 0;
+                        return; 
+                    }
                 }
                 
                 if (!transformAction && selectedMask.subShapes) {
@@ -914,7 +1054,7 @@
             if(App.shape === 'polygon') {
                 let hitIdx = -1;
                 if(draftMask && draftMask.points) {
-                    hitIdx = draftMask.points.findIndex(p => Math.hypot(pt.x - p.x, pt.y - p.y) < 25 / qs);
+                    hitIdx = draftMask.points.findIndex(p => Math.hypot(pt.x - p.x, pt.y - p.y) < 12 / qs);
                 }
                 
                 if (hitIdx > -1) {
@@ -944,7 +1084,7 @@
             if(App.shape === 'polygon') {
                 let hitIdx = -1;
                 if(draftMask && draftMask.points) {
-                    hitIdx = draftMask.points.findIndex(p => Math.hypot(x - p.x, y - p.y) < 25 / qs);
+                    hitIdx = draftMask.points.findIndex(p => Math.hypot(x - p.x, y - p.y) < 12 / qs);
                 }
                 
                 if (hitIdx > -1) {
@@ -973,8 +1113,17 @@
             if(pointers.size === 1) {
                 if (selectedMask) {
                     const pt = getInversePoint(x, y, selectedMask);
-                    transformAction = checkHandlesHit(pt.x - selectedMask.startX, pt.y - selectedMask.startY);
-                    if (transformAction) { isDragging = true; dragStartX = x; dragStartY = y; return; }
+                    const bbox = getBoundingBox(selectedMask, qs);
+                    transformAction = checkHandlesHit(pt.x * qs, pt.y * qs, bbox, qs);
+                    if (transformAction) { 
+                        isDragging = true; dragStartX = x; dragStartY = y; 
+                        const anchor = getAbsoluteAnchor(selectedMask, null, qs);
+                        dragStartDist = Math.hypot(x - anchor.x, y - anchor.y);
+                        dragStartAngle = Math.atan2(y - anchor.y, x - anchor.x);
+                        initScale = selectedMask.scale || 1;
+                        initRot = selectedMask.rotation || 0;
+                        return; 
+                    }
                 }
 
                 const hit = findHitMask(x, y);
@@ -991,8 +1140,7 @@
             } else if (pointers.size === 2 && selectedMask) {
                 isDragging = false; isPinching = true; transformAction = null;
                 const pts = Array.from(pointers.values());
-                initPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-                initPinchAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+                dragStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
                 const target = (App.mode === 'EDIT_MASK' && selectedSubMask) ? selectedSubMask : selectedMask;
                 initScale = target.scale || 1; initRot = target.rotation || 0;
             }
@@ -1009,6 +1157,8 @@
         const y = (e.clientY - rect.top) * ratioY;
         
         pointers.get(e.pointerId).x = x; pointers.get(e.pointerId).y = y;
+        
+        const qs = App.quality;
 
         if (draggedDraftPointIdx > -1 && draftMask && draftMask.points) {
             if (App.mode === 'EDIT_MASK' && selectedMask) {
@@ -1042,16 +1192,18 @@
             if(isPinching && pointers.size === 2) {
                 const pts = Array.from(pointers.values());
                 const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-                const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
-                target.scale = Math.max(0.1, initScale * (dist / initPinchDist));
-                target.rotation = initRot + (angle - initPinchAngle) * (180/Math.PI);
+                target.scale = Math.max(0.1, initScale * (dist / dragStartDist));
             } else if(isDragging && pointers.size === 1) {
                 if (transformAction === 'scale') {
-                    const dy = y - dragStartY;
-                    target.scale = Math.max(0.1, (target.scale || 1) + (dy * 0.01));
+                    const anchor = getAbsoluteAnchor(target, target === selectedSubMask ? selectedMask : null, qs);
+                    const currentDist = Math.hypot(x - anchor.x, y - anchor.y);
+                    if (dragStartDist > 5) {
+                        target.scale = Math.max(0.1, initScale * (currentDist / dragStartDist));
+                    }
                 } else if (transformAction === 'rotate') {
-                    const dx = x - dragStartX;
-                    target.rotation = (target.rotation || 0) + dx;
+                    const anchor = getAbsoluteAnchor(target, target === selectedSubMask ? selectedMask : null, qs);
+                    const currentAngle = Math.atan2(y - anchor.y, x - anchor.x);
+                    target.rotation = initRot + (currentAngle - dragStartAngle) * (180 / Math.PI);
                 } else if (transformAction === 'move') {
                     let mx = x - dragStartX, my = y - dragStartY;
                     if (target === selectedSubMask) {
@@ -1062,8 +1214,8 @@
                         mx = rx; my = ry;
                     }
                     target.offsetX += mx; target.offsetY += my;
+                    dragStartX = x; dragStartY = y;
                 }
-                dragStartX = x; dragStartY = y;
             }
         }
     });
@@ -1076,7 +1228,7 @@
         if(pointers.size === 0) { isDragging = false; transformAction = null; }
     });
 
-    document.getElementById('finishPolyBtn').onclick = () => { if(draftMask && draftMask.points.length > 2) finishDraft(); };
+    document.getElementById('finishPolyBtn').onclick = () => { if(draftMask && draftMask.points && draftMask.points.length > 2) finishDraft(); };
 
     function createBaseMask(x,y) {
         if(App.shape === 'template' && App.templates.length) {
@@ -1093,13 +1245,24 @@
             startX: x, startY: y, endX: x, endY: y, offsetX: 0, offsetY: 0, 
             mediaOffsetX: 0, mediaOffsetY: 0, mediaScale: 1,
             scale: 1, rotation: 0, flipX: false, flipY: false, points: [], text: '', boolOp: 'normal',
-            strokeWidth: 0, strokeColor: '#ffffff'
+            strokeWidth: 0, strokeColor: '#ffffff', strokeOrder: 'outer'
         };
         if (App.shape === 'svg_mask') m.svgId = App.activeSvgId;
         return m;
     }
 
     function finishDraft() {
+        if (draftMask && (draftMask.type === 'polygon' || draftMask.type === 'freedraw')) {
+            if (draftMask.points && draftMask.points.length > 0) {
+                let minX = Math.min(...draftMask.points.map(p => p.x));
+                let maxX = Math.max(...draftMask.points.map(p => p.x));
+                let minY = Math.min(...draftMask.points.map(p => p.y));
+                let maxY = Math.max(...draftMask.points.map(p => p.y));
+                draftMask.startX = minX + (maxX - minX) / 2;
+                draftMask.startY = minY + (maxY - minY) / 2;
+            }
+        }
+
         if (App.mode === 'EDIT_MASK' && selectedMask) {
             if(!selectedMask.subShapes) selectedMask.subShapes = [];
             selectedMask.subShapes.push(JSON.parse(JSON.stringify(draftMask)));
@@ -1199,10 +1362,21 @@
         floatingMenu.style.top = `${Math.min(screenY + 50, canvasWrapper.clientHeight - 200)}px`;
         floatingMenu.classList.remove('hidden');
         
-        // Синхронизация значений обводки
         document.getElementById('strokeColorPicker').value = selectedMask.strokeColor || '#ffffff';
         document.getElementById('strokeWidthSlider').value = selectedMask.strokeWidth || 0;
         document.getElementById('strokeWidthVal').innerText = selectedMask.strokeWidth || 0;
+        
+        const strokeOrder = selectedMask.strokeOrder || 'outer';
+        let strokeOrderText = '🔲 Outer';
+        if (strokeOrder === 'inner') strokeOrderText = '🔳 Inner';
+        if (strokeOrder === 'center') strokeOrderText = '〰️ Center';
+        document.getElementById('strokeOrderBtn').innerText = strokeOrderText;
+
+        if (selectedMask.type === 'text') {
+            document.getElementById('editTextBtn').classList.remove('hidden');
+        } else {
+            document.getElementById('editTextBtn').classList.add('hidden');
+        }
 
         const isVid = selectedMask.clonedMedia && selectedMask.clonedMedia.tagName === 'VIDEO';
         document.getElementById('videoControls').style.display = isVid ? 'flex' : 'none';
@@ -1210,8 +1384,48 @@
             document.getElementById('speedSlider').value = selectedMask.clonedMedia.playbackRate;
             document.getElementById('speedVal').innerText = selectedMask.clonedMedia.playbackRate.toFixed(1) + 'x';
             document.getElementById('speedSlider').oninput = e => { selectedMask.clonedMedia.playbackRate = e.target.value; document.getElementById('speedVal').innerText = e.target.value + 'x'; };
+            document.getElementById('maskPlayPauseBtn').innerText = selectedMask.clonedMedia.paused ? '▶️' : '⏸️';
         }
     }
+
+    document.getElementById('maskPlayPauseBtn').onclick = function() {
+        if (selectedMask && selectedMask.clonedMedia && selectedMask.clonedMedia.tagName === 'VIDEO') {
+            if (selectedMask.clonedMedia.paused) {
+                selectedMask.clonedMedia.play();
+                this.innerText = '⏸️';
+            } else {
+                selectedMask.clonedMedia.pause();
+                this.innerText = '▶️';
+            }
+        }
+    };
+
+    document.getElementById('editTextBtn').onclick = () => {
+        if (selectedMask && selectedMask.type === 'text') {
+            showModal("Edit Text", selectedMask.text, (val) => {
+                if (val) {
+                    saveUndo();
+                    selectedMask.text = val;
+                }
+            });
+        }
+    };
+    
+    document.getElementById('strokeOrderBtn').onclick = function() {
+        if(selectedMask) {
+            saveUndo();
+            const order = selectedMask.strokeOrder || 'outer';
+            if (order === 'outer') selectedMask.strokeOrder = 'inner';
+            else if (order === 'inner') selectedMask.strokeOrder = 'center';
+            else selectedMask.strokeOrder = 'outer';
+            
+            const newOrder = selectedMask.strokeOrder;
+            let strokeOrderText = '🔲 Outer';
+            if (newOrder === 'inner') strokeOrderText = '🔳 Inner';
+            if (newOrder === 'center') strokeOrderText = '〰️ Center';
+            this.innerText = strokeOrderText;
+        }
+    };
 
     document.getElementById('closeMenuBtn').onclick = (e) => { e.stopPropagation(); floatingMenu.classList.add('hidden'); };
     document.getElementById('deleteMaskBtn').onclick = () => { if(selectedMask) masks = masks.filter(x => x !== selectedMask); selectedMask = null; floatingMenu.classList.add('hidden'); };
@@ -1221,7 +1435,6 @@
     document.getElementById('flipXBtn').onclick = () => { if(selectedMask) { saveUndo(); selectedMask.flipX = !selectedMask.flipX; } };
     document.getElementById('flipYBtn').onclick = () => { if(selectedMask) { saveUndo(); selectedMask.flipY = !selectedMask.flipY; } };
 
-    // Управление обводкой
     document.getElementById('strokeColorPicker').oninput = (e) => {
         if(selectedMask) selectedMask.strokeColor = e.target.value;
     };
@@ -1254,7 +1467,7 @@
         App.activeTool = 'draw'; 
         updateToolUI();
         document.getElementById('editMaskToolbar').classList.remove('hidden');
-        document.getElementById('editOpAdd').click(); 
+        document.getElementById('editOpSub').click(); 
     };
     
     document.getElementById('editOpAdd').onclick = function() {
@@ -1270,14 +1483,28 @@
         document.getElementById('editOpAdd').classList.replace('bg-blue-600', 'bg-neutral-800'); document.getElementById('editOpAdd').classList.replace('text-white', 'text-neutral-400');
         if (App.mode === 'EDIT_MASK' && selectedSubMask) selectedSubMask.boolOp = 'subtract';
     };
+
+    document.getElementById('editOpDel').onclick = function() {
+        if (selectedMask && selectedSubMask) {
+            saveUndo();
+            selectedMask.subShapes = selectedMask.subShapes.filter(s => s !== selectedSubMask);
+            selectedSubMask = null;
+        }
+    };
     
     document.getElementById('editFinishBtn').onclick = () => { 
-        App.mode = 'MOVING';
-        App.activeTool = 'move';
-        updateToolUI();
+        if (draftMask && draftMask.points && draftMask.points.length > 2) {
+            finishDraft();
+        }
+        draftMask = null;
+        draggedDraftPointIdx = -1;
+        
+        setMode('MOVING', true);
+        
         selectedSubMask = null; 
         document.getElementById('editMaskToolbar').classList.add('hidden');
         document.getElementById('finishPolyBtn').classList.add('hidden');
+        floatingMenu.classList.add('hidden');
     };
 
     document.getElementById('saveTemplateBtn').onclick = () => {
@@ -1289,6 +1516,8 @@
                 App.templates.push(template); 
                 localStorage.setItem('sms_templates', JSON.stringify(App.templates));
                 floatingMenu.classList.add('hidden');
+                
+                showAlert("Template Saved!", "Ваш шаблон успешно сохранен во внутреннюю память браузера.\n\nВы можете найти его в любое время, выбрав инструмент 🧩 (Templates) на правой панели.");
             } 
         });
     };
@@ -1302,6 +1531,33 @@
             else ctxTarget.drawImage(el, x, y);
             return true;
         } catch(e) { return false; }
+    }
+
+    function drawContourStroke(ctxTarget, img, x, y, w, h, color, width) {
+        if(!img || width <= 0) return;
+        const pad = width * 2;
+        contourCanvas.width = w + pad * 2; 
+        contourCanvas.height = h + pad * 2;
+        contourCtx.clearRect(0,0, contourCanvas.width, contourCanvas.height);
+        
+        // Optimized: Reduced number of steps for UI overlays
+        const steps = 8;
+        for(let i=0; i<steps; i++) {
+            const angle = (i / steps) * Math.PI * 2;
+            const ox = Math.cos(angle) * width;
+            const oy = Math.sin(angle) * width;
+            contourCtx.drawImage(img, pad + ox, pad + oy, w, h);
+        }
+        
+        contourCtx.globalCompositeOperation = 'source-in';
+        contourCtx.fillStyle = color;
+        contourCtx.fillRect(0,0, contourCanvas.width, contourCanvas.height);
+        
+        contourCtx.globalCompositeOperation = 'destination-out';
+        contourCtx.drawImage(img, pad, pad, w, h);
+        
+        contourCtx.globalCompositeOperation = 'source-over';
+        ctxTarget.drawImage(contourCanvas, x - pad, y - pad);
     }
 
     function render(ctxTarget, qs, w, h, isExport) {
@@ -1324,7 +1580,7 @@
         }
 
         const lCv = isExport ? exportLayerCanvas : previewLayerCanvas;
-        const lCtx = lCv.getContext('2d', isExport ? {} : { willReadFrequently: true });
+        const lCtx = lCv.getContext('2d');
         lCtx.clearRect(0, 0, w, h);
 
         const mBuf = isExport ? exportMaskBuffer : maskBuffer;
@@ -1373,12 +1629,75 @@
                 });
             }
             
+            mCtx.restore();
+
+            let drawStrokeFront = false;
+            if (m.strokeWidth > 0) {
+                contourCanvas.width = w; contourCanvas.height = h;
+                contourCtx.clearRect(0, 0, w, h);
+                contourBgCanvas.width = w; contourBgCanvas.height = h;
+                contourBgCtx.clearRect(0, 0, w, h);
+                
+                const sw = m.strokeWidth * qs;
+                // Optimized: Tied rendering steps to App.quality to save CPU on LQ modes
+                const steps = Math.max(4, Math.floor((sw > 15 ? 16 : 8) * (isExport ? 1.0 : qs))); 
+                const strokeOrder = m.strokeOrder || 'outer';
+                
+                // Outer part of the stroke (drawn behind the mask)
+                if (strokeOrder === 'outer' || strokeOrder === 'center') {
+                    const currentSw = strokeOrder === 'center' ? sw / 2 : sw;
+                    contourBgCtx.globalCompositeOperation = 'source-over';
+                    for(let i=0; i<steps; i++) {
+                        const angle = (i / steps) * Math.PI * 2;
+                        contourBgCtx.drawImage(mBuf, Math.cos(angle)*currentSw, Math.sin(angle)*currentSw);
+                    }
+                    contourBgCtx.globalCompositeOperation = 'source-in';
+                    contourBgCtx.fillStyle = m.strokeColor || '#ffffff';
+                    contourBgCtx.fillRect(0, 0, w, h);
+                    
+                    contourBgCtx.globalCompositeOperation = 'destination-out';
+                    contourBgCtx.drawImage(mBuf, 0, 0);
+                    contourBgCtx.globalCompositeOperation = 'source-over';
+                    
+                    lCtx.drawImage(contourBgCanvas, 0, 0);
+                }
+
+                // Inner part of the stroke (drawn on top of the mask)
+                if (strokeOrder === 'inner' || strokeOrder === 'center') {
+                    const currentSw = strokeOrder === 'center' ? sw / 2 : sw;
+                    drawStrokeFront = true;
+                    
+                    contourCtx.globalCompositeOperation = 'source-over';
+                    contourCtx.drawImage(mBuf, 0, 0); // Original mask
+                    
+                    contourCtx.globalCompositeOperation = 'source-in';
+                    for(let i=0; i<steps; i++) {
+                        const angle = (i / steps) * Math.PI * 2;
+                        contourCtx.drawImage(mBuf, Math.cos(angle)*currentSw, Math.sin(angle)*currentSw);
+                    }
+                    
+                    // Now contourCtx has the SHRUNKEN mask. We subtract it from the Original mask.
+                    contourCtx.globalCompositeOperation = 'source-out';
+                    contourCtx.drawImage(mBuf, 0, 0);
+                    
+                    // Color it
+                    contourCtx.globalCompositeOperation = 'source-in';
+                    contourCtx.fillStyle = m.strokeColor || '#ffffff';
+                    contourCtx.fillRect(0, 0, w, h);
+                    contourCtx.globalCompositeOperation = 'source-over';
+                }
+            }
+
+            // Fill mask with video
             mCtx.globalCompositeOperation = 'source-in';
             mCtx.save();
             
+            // Apply mask transform so the video moves WITH the mask
+            applyTransform(mCtx, m, qs);
+            
             const mScale = m.mediaScale || 1;
-            const maskCx = m.startX * qs;
-            const maskCy = m.startY * qs;
+            const maskCx = (m.startX || 0) * qs;
+            const maskCy = (m.startY || 0) * qs;
             
             mCtx.translate(maskCx, maskCy);
             mCtx.scale(mScale, mScale);
@@ -1389,76 +1708,72 @@
             const mediaDrawn = drawMediaSafe(mCtx, m.clonedMedia, 0, 0, w, h);
             mCtx.restore();
             
-            // Наложение обводки (Stroke) поверх готовой маски с видео
-            mCtx.globalCompositeOperation = 'source-over';
-            if (m.strokeWidth > 0) {
-                mCtx.strokeStyle = m.strokeColor || '#ffffff';
-                mCtx.lineWidth = m.strokeWidth * qs;
-                mCtx.lineJoin = 'round';
-                
-                mCtx.beginPath();
-                if(m.type === 'text') {
-                    mCtx.strokeText(m.text, m.startX*qs, m.startY*qs);
-                } else if (m.type === 'svg_mask') {
-                    mCtx.strokeRect(m.startX*qs, m.startY*qs, (m.endX-m.startX)*qs, (m.endY-m.startY)*qs);
-                } else {
-                    buildPath(mCtx, m, qs);
-                    mCtx.stroke();
-                }
-
-                if (m.subShapes) {
-                    m.subShapes.forEach(sub => {
-                        mCtx.save();
-                        applyTransform(mCtx, sub, qs);
-                        mCtx.beginPath();
-                        if(sub.type === 'text') {
-                            mCtx.strokeText(sub.text, (sub.startX*qs), (sub.startY*qs));
-                        } else if (sub.type === 'svg_mask') {
-                            mCtx.strokeRect(sub.startX*qs, sub.startY*qs, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
-                        } else {
-                            buildPath(mCtx, sub, qs);
-                            mCtx.stroke();
-                        }
-                        mCtx.restore();
-                    });
-                }
-            }
-            
-            mCtx.restore();
-
             if (!mediaDrawn) mCtx.clearRect(0,0,w,h);
 
+            // Draw video to layer
             if (mBuf.width > 0 && mBuf.height > 0) lCtx.drawImage(mBuf, 0, 0); 
+            
+            // Draw inner stroke (Front) over the video
+            if (drawStrokeFront && contourCanvas.width > 0) {
+                lCtx.drawImage(contourCanvas, 0, 0);
+            }
         });
 
         if (lCv.width > 0 && lCv.height > 0) ctxTarget.drawImage(lCv, 0, 0, w, h);
+    }
+    
+    function drawHandles(ctxTarget, bbox, qs, color) {
+        const s = 16 * qs; 
+        const r = 8 * qs;  
+        
+        ctxTarget.lineWidth = 2 * qs;
+        
+        ctxTarget.fillStyle = '#10b981'; 
+        ctxTarget.strokeStyle = '#ffffff';
+        const edges = [
+            {x: bbox.x + bbox.w/2, y: bbox.y},
+            {x: bbox.x + bbox.w/2, y: bbox.y + bbox.h},
+            {x: bbox.x, y: bbox.y + bbox.h/2},
+            {x: bbox.x + bbox.w, y: bbox.y + bbox.h/2}
+        ];
+        edges.forEach(pt => {
+            ctxTarget.beginPath(); ctxTarget.arc(pt.x, pt.y, r, 0, Math.PI*2); ctxTarget.fill(); ctxTarget.stroke();
+        });
+        
+        ctxTarget.fillStyle = color; 
+        ctxTarget.strokeStyle = '#ffffff';
+        const corners = [
+            {x: bbox.x, y: bbox.y}, {x: bbox.x + bbox.w, y: bbox.y},
+            {x: bbox.x, y: bbox.y + bbox.h}, {x: bbox.x + bbox.w, y: bbox.y + bbox.h}
+        ];
+        corners.forEach(pt => {
+            ctxTarget.fillRect(pt.x - s/2, pt.y - s/2, s, s);
+            ctxTarget.strokeRect(pt.x - s/2, pt.y - s/2, s, s);
+        });
     }
 
     function drawUIOverlays(ctxTarget, qs) {
         if(selectedMask) {
             ctxTarget.save(); 
             applyTransform(ctxTarget, selectedMask, qs);
-            const cx = selectedMask.startX * qs;
-            const cy = selectedMask.startY * qs;
+            const bbox = getBoundingBox(selectedMask, qs);
 
             if (App.mode === 'MOVING') {
                 ctxTarget.strokeStyle = 'rgba(255,255,255,0.5)'; ctxTarget.setLineDash([5*qs,5*qs]); ctxTarget.lineWidth = 2*qs;
-                ctxTarget.strokeRect(cx - 100*qs, cy - 100*qs, 200*qs, 200*qs);
+                ctxTarget.strokeRect(bbox.x, bbox.y, bbox.w, bbox.h);
                 ctxTarget.setLineDash([]);
                 
-                ctxTarget.fillStyle = '#fff'; ctxTarget.strokeStyle = '#3b82f6'; ctxTarget.lineWidth = 4*qs;
-                ctxTarget.beginPath(); ctxTarget.arc(cx, cy - 100*qs, 20*qs, 0, Math.PI*2); ctxTarget.fill(); ctxTarget.stroke();
-                ctxTarget.fillRect(cx + 100*qs - 20*qs, cy + 100*qs - 20*qs, 40*qs, 40*qs);
-                ctxTarget.strokeRect(cx + 100*qs - 20*qs, cy + 100*qs - 20*qs, 40*qs, 40*qs);
+                drawHandles(ctxTarget, bbox, qs, '#3b82f6');
             }
 
             ctxTarget.strokeStyle = '#3b82f6'; ctxTarget.lineWidth = 4*qs;
             ctxTarget.beginPath();
             if(selectedMask.type === 'text') {
                 ctxTarget.font = `bold ${100*qs}px system-ui`; ctxTarget.textAlign = 'center'; ctxTarget.textBaseline = 'middle';
-                ctxTarget.strokeText(selectedMask.text, cx, cy);
+                ctxTarget.strokeText(selectedMask.text, selectedMask.startX*qs, selectedMask.startY*qs);
             } else if (selectedMask.type === 'svg_mask') {
-                ctxTarget.strokeRect(cx, cy, (selectedMask.endX-selectedMask.startX)*qs, (selectedMask.endY-selectedMask.startY)*qs);
+                const svgItem = App.svgMasks.find(s => s.id === selectedMask.svgId);
+                drawContourStroke(ctxTarget, svgItem?.img, selectedMask.startX*qs, selectedMask.startY*qs, (selectedMask.endX-selectedMask.startX)*qs, (selectedMask.endY-selectedMask.startY)*qs, '#3b82f6', 2*qs);
             } else { buildPath(ctxTarget, selectedMask, qs); ctxTarget.stroke(); }
             
             if(selectedMask.subShapes) {
@@ -1466,29 +1781,24 @@
                     ctxTarget.save(); applyTransform(ctxTarget, sub, qs);
                     ctxTarget.strokeStyle = (App.mode === 'EDIT_MASK' && selectedSubMask === sub) ? '#fbbf24' : (sub.boolOp === 'subtract' ? '#ef4444' : '#10b981');
                     ctxTarget.lineWidth = (App.mode === 'EDIT_MASK' && selectedSubMask === sub) ? 4*qs : 2*qs;
-                    
-                    const scx = (sub.startX * qs);
-                    const scy = (sub.startY * qs);
 
                     if (App.mode === 'EDIT_MASK' && selectedSubMask === sub) {
+                        const sBbox = getBoundingBox(sub, qs);
                         ctxTarget.strokeStyle = 'rgba(255,255,255,0.5)'; ctxTarget.setLineDash([5*qs,5*qs]); ctxTarget.lineWidth = 2*qs;
-                        ctxTarget.strokeRect(scx - 100*qs, scy - 100*qs, 200*qs, 200*qs);
+                        ctxTarget.strokeRect(sBbox.x, sBbox.y, sBbox.w, sBbox.h);
                         ctxTarget.setLineDash([]);
 
-                        ctxTarget.fillStyle = '#fbbf24'; ctxTarget.strokeStyle = '#000'; ctxTarget.lineWidth = 2*qs;
-                        ctxTarget.beginPath(); ctxTarget.arc(scx, scy - 100*qs, 20*qs, 0, Math.PI*2); ctxTarget.fill(); ctxTarget.stroke();
-                        ctxTarget.fillRect(scx + 100*qs - 20*qs, scy + 100*qs - 20*qs, 40*qs, 40*qs);
-                        ctxTarget.strokeRect(scx + 100*qs - 20*qs, scy + 100*qs - 20*qs, 40*qs, 40*qs);
-
+                        drawHandles(ctxTarget, sBbox, qs, '#fbbf24');
                         ctxTarget.strokeStyle = '#fbbf24'; ctxTarget.lineWidth = 4*qs;
                     }
 
                     ctxTarget.beginPath();
                     if(sub.type === 'text') {
                         ctxTarget.font = `bold ${100*qs}px system-ui`; ctxTarget.textAlign = 'center'; ctxTarget.textBaseline = 'middle';
-                        ctxTarget.strokeText(sub.text, scx, scy);
+                        ctxTarget.strokeText(sub.text, sub.startX*qs, sub.startY*qs);
                     } else if (sub.type === 'svg_mask') {
-                        ctxTarget.strokeRect(scx, scy, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs);
+                        const svgItem = App.svgMasks.find(s => s.id === sub.svgId);
+                        drawContourStroke(ctxTarget, svgItem?.img, sub.startX*qs, sub.startY*qs, (sub.endX-sub.startX)*qs, (sub.endY-sub.startY)*qs, ctxTarget.strokeStyle, ctxTarget.lineWidth/2);
                     } else { buildPath(ctxTarget, sub, qs); ctxTarget.stroke(); }
                     ctxTarget.restore();
                 });
@@ -1540,8 +1850,12 @@
         }
     }
 
+    // Optimized: FPS Limiter for Preview (Caps at 60fps to prevent 120/144hz monitor overload)
     let lastRenderTime = 0;
-    const exportFpsInterval = 1000 / 30; // Лимит в 30 FPS для экспорта
+    let lastPreviewTime = 0;
+    const maxPreviewFps = 60;
+    const previewFpsInterval = 1000 / maxPreviewFps;
+    const exportFpsInterval = 1000 / 30; 
 
     function loop(now) {
         requestAnimationFrame(loop);
@@ -1555,6 +1869,10 @@
             ctx.drawImage(exportCanvas, 0, 0, canvas.width, canvas.height);
             drawUIOverlays(ctx, App.quality);
         } else {
+            // Optimized: Prevent preview from rendering faster than 60fps
+            if (now - lastPreviewTime < previewFpsInterval) return;
+            lastPreviewTime = now;
+
             render(ctx, App.quality, canvas.width, canvas.height, false);
             drawUIOverlays(ctx, App.quality);
         }
